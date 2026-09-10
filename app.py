@@ -1,7 +1,7 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "ruta_fria.db")
@@ -10,6 +10,46 @@ def get_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
+
+def init_tables():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        telefono TEXT,
+        direccion TEXT,
+        notas TEXT
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        rol TEXT NOT NULL, -- 'Administrador', 'Socio', 'Operador'
+        nombre TEXT
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS auditoria_tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        folio TEXT,
+        usuario TEXT,
+        accion TEXT,
+        motivo TEXT,
+        fecha_hora TEXT
+    )
+    """)
+    # Asegurar usuarios por defecto si no existen
+    cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('admin', '1234', 'Administrador', 'Fernando (Dueño)')")
+    cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('socio', '1234', 'Socio', 'Socio Ruta Fría')")
+    cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('cajero', '1234', 'Operador', 'Personal de Caja')")
+    conn.commit()
+    conn.close()
+
+init_tables()
 
 st.set_page_config(
     page_title="Ruta Fría - Sistema POS y Gestión",
@@ -34,25 +74,102 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Menú lateral
-st.sidebar.image("https://img.icons8.com/color/96/cold-drink.png", width=80)
+# GESTIÓN DE SESIÓN Y LOGIN
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+if st.session_state.user is None:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=200)
+        else:
+            st.image("https://img.icons8.com/color/96/cold-drink.png", width=100)
+        
+        st.markdown("<h1 style='text-align: center; color: #00A8E8;'>Ruta Fría POS</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Inicia sesión para acceder al sistema</p>", unsafe_allow_html=True)
+        
+        with st.form("login_form"):
+            username = st.text_input("Usuario")
+            password = st.text_input("Contraseña", type="password")
+            submit_login = st.form_submit_button("🔑 Entrar al Sistema")
+            
+            if submit_login:
+                conn = get_connection()
+                user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
+                conn.close()
+                if user_row:
+                    st.session_state.user = {
+                        "id": user_row['id'],
+                        "username": user_row['username'],
+                        "nombre": user_row['nombre'],
+                        "rol": user_row['rol']
+                    }
+                    st.success(f"¡Bienvenido, {user_row['nombre']}!")
+                    st.rerun()
+                else:
+                    st.error("Usuario o contraseña incorrectos.")
+    st.stop()
+
+# Menú lateral con Logo y Perfil
+logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, width=160)
+else:
+    st.sidebar.image("https://img.icons8.com/color/96/cold-drink.png", width=80)
+
 st.sidebar.title("Ruta Fría POS")
+st.sidebar.markdown(f"👤 **{st.session_state.user['nombre']}**\n\n🛡️ Rol: *{st.session_state.user['rol']}*")
 st.sidebar.markdown("---")
 
-menu = st.sidebar.radio(
-    "Navegación",
-    ["🛒 Punto de Venta (POS)", "📦 Inventario de Insumos", "🍔 Productos y Recetas", "🎁 Combos y Paquetes", "💰 Ventas y Finanzas", "📊 Inversiones y Gastos"]
-)
+menu_options = ["🛒 Punto de Venta (POS)", "📦 Inventario de Insumos", "🍔 Productos y Recetas", "🎁 Combos y Paquetes", "👥 Clientes y Domicilios", "💰 Ventas y Finanzas", "📊 Reportes y Utilidad"]
+
+if st.session_state.user['rol'] == 'Administrador':
+    menu_options.append("⚙️ Gestión de Usuarios")
+
+menu = st.sidebar.radio("Navegación", menu_options)
+
+if st.sidebar.button("🚪 Cerrar Sesión"):
+    st.session_state.user = None
+    st.session_state.carrito = []
+    st.rerun()
 
 # ----------------------------------------------------
-# 1. PUNTO DE VENTA (POS)
+# 1. PUNTO DE VENTA (POS) CON CLIENTE Y MODIFICACIÓN CON AUDITORÍA
 # ----------------------------------------------------
 if menu == "🛒 Punto de Venta (POS)":
     st.markdown('<p class="main-header">🧊 Punto de Venta - Ruta Fría</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Caja rápida para venta de bebidas, clamatos, frutimiches y combos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Caja rápida con captura de datos de clientes para servicio a domicilio o local</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     
+    # Selección de Cliente
+    clientes_rows = conn.execute("SELECT * FROM clientes").fetchall()
+    cliente_nombres = ["Venta General / Mostrador"] + [f"{c['nombre']} ({c['telefono'] or 'Sin tel'})" for c in clientes_rows]
+    
+    col_c1, col_c2 = st.columns([2, 1])
+    with col_c1:
+        sel_cliente = st.selectbox("📍 Cliente (Domicilio o Mostrador)", cliente_nombres)
+    with col_c2:
+        if st.button("➕ Registrar Nuevo Cliente"):
+            st.session_state.show_new_client = True
+
+    if st.session_state.get('show_new_client', False):
+        with st.form("quick_client_form"):
+            st.subheader("Nuevo Cliente Rápido")
+            qc_nombre = st.text_input("Nombre Completo")
+            qc_tel = st.text_input("Teléfono / WhatsApp")
+            qc_dir = st.text_area("Dirección de Entrega")
+            if st.form_submit_button("Guardar Cliente"):
+                if qc_nombre:
+                    c_cur = conn.cursor()
+                    c_cur.execute("INSERT INTO clientes (nombre, telefono, direccion) VALUES (?, ?, ?)", (qc_nombre, qc_tel, qc_dir))
+                    conn.commit()
+                    st.success("¡Cliente registrado!")
+                    st.session_state.show_new_client = False
+                    st.rerun()
+
     tab_prod, tab_combo = st.tabs(["🥤 Productos Individuales", "🎁 Paquetes y Combos"])
 
     if "carrito" not in st.session_state:
@@ -112,7 +229,7 @@ if menu == "🛒 Punto de Venta (POS)":
                     st.success(f"¡Combo agregado!")
 
     st.markdown("---")
-    st.subheader("🛒 Resumen de Ticket Actual")
+    st.subheader("🛒 Resumen de Ticket Actual y Modificación con Auditoría")
 
     if len(st.session_state.carrito) > 0:
         for i, item in enumerate(st.session_state.carrito):
@@ -121,9 +238,18 @@ if menu == "🛒 Punto de Venta (POS)":
             c2.write(f"${item['precio']:.2f}")
             
             nueva_cant = c3.number_input("Cant", value=item['cantidad'], min_value=1, key=f"cant_{i}")
-            st.session_state.carrito[i]['cantidad'] = nueva_cant
+            if nueva_cant != item['cantidad']:
+                # Pedir motivo de modificación para auditoría
+                motivo_mod = st.text_input(f"Motivo por el cual modifica la cantidad de {item['nombre']}:", key=f"mot_{i}")
+                if motivo_mod:
+                    item['cantidad'] = nueva_cant
+                    # Registrar auditoría
+                    cur_aud = conn.cursor()
+                    cur_aud.execute("INSERT INTO auditoria_tickets (folio, usuario, accion, motivo, fecha_hora) VALUES (?, ?, ?, ?, ?)",
+                                    ("EN_CURSO", st.session_state.user['username'], f"Modificar cantidad a {nueva_cant}", motivo_mod, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                    conn.commit()
             
-            subtotal = item['precio'] * nueva_cant
+            subtotal = item['precio'] * item['cantidad']
             c4.write(f"**${subtotal:.2f}**")
             
             if c5.button("❌", key=f"del_{i}"):
@@ -138,7 +264,7 @@ if menu == "🛒 Punto de Venta (POS)":
         st.markdown(f"Utilidad neta estimada: **${utilidad_estimada:.2f}**")
 
         metodo_pago = st.selectbox("Método de Pago", ["Efectivo", "Transferencia / QR", "Tarjeta"])
-        notas_venta = st.text_input("Notas o Nombre de Cliente (opcional)")
+        notas_venta = st.text_input("Notas adicionales del pedido")
 
         col_b1, col_b2 = st.columns(2)
         with col_b1:
@@ -149,12 +275,13 @@ if menu == "🛒 Punto de Venta (POS)":
             if st.button("✅ Cobrar y Registrar Venta", type="primary"):
                 folio = f"RF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
                 fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cliente_final = sel_cliente if sel_cliente != "Venta General / Mostrador" else "Mostrador"
 
                 cursor = conn.cursor()
                 cursor.execute("""
                 INSERT INTO ventas (folio, fecha_hora, total_venta, costo_total, utilidad_neta, metodo_pago, notas)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (folio, fecha_hora, total_general, costo_general, utilidad_estimada, metodo_pago, notas_venta))
+                """, (folio, fecha_hora, total_general, costo_general, utilidad_estimada, metodo_pago, f"Cliente: {cliente_final} | {notas_venta}"))
                 venta_id = cursor.lastrowid
 
                 for item in st.session_state.carrito:
@@ -191,16 +318,15 @@ if menu == "🛒 Punto de Venta (POS)":
     conn.close()
 
 # ----------------------------------------------------
-# 2. INVENTARIO DE INSUMOS (CON EDICIÓN Y ELIMINACIÓN LIBRE)
+# 2. INVENTARIO DE INSUMOS (CON PERMISOS DE ELIMINACIÓN)
 # ----------------------------------------------------
 elif menu == "📦 Inventario de Insumos":
     st.markdown('<p class="main-header">📦 Control Total de Insumos y Materia Prima</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Edita, corrige nombres, unidades, stock o elimina insumos libremente</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Gestión de stock con restricciones de rol</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     insumos_list = conn.execute("SELECT * FROM insumos").fetchall()
 
-    st.subheader("📝 Edición Rápida y Eliminación de Insumos")
     for ins in insumos_list:
         with st.expander(f"📌 {ins['nombre']} (Stock: {ins['stock_actual']} {ins['unidad']})"):
             with st.form(f"form_edit_insumo_{ins['id']}"):
@@ -230,100 +356,41 @@ elif menu == "📦 Inventario de Insumos":
                     st.rerun()
 
                 if btn_eliminar:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM insumos WHERE id = ?", (ins['id'],))
-                    cursor.execute("DELETE FROM recetas WHERE insumo_id = ?", (ins['id'],))
-                    conn.commit()
-                    conn.close()
-                    st.warning("Insumo eliminado del sistema.")
-                    st.rerun()
-
-    st.markdown("---")
-    st.subheader("➕ Agregar Nuevo Insumo desde Cero")
-    with st.form("form_nuevo_insumo"):
-        n_nom = st.text_input("Nombre del nuevo insumo")
-        n_cat = st.text_input("Categoría", value="General")
-        n_uni = st.text_input("Unidad (ml, g, pza)", value="pza")
-        n_costo = st.number_input("Costo por unidad base ($)", min_value=0.0, value=10.0)
-        n_stock = st.number_input("Stock inicial", min_value=0.0, value=10.0)
-        n_min = st.number_input("Stock mínimo alerta", value=2.0)
-        n_prov = st.text_input("Proveedor", value="Local")
-
-        if st.form_submit_button("Crear Insumo"):
-            cursor = conn.cursor()
-            cursor.execute("""
-            INSERT INTO insumos (nombre, categoria, unidad, costo_unidad, stock_actual, stock_minimo, proveedor, fecha_actualizacion)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (n_nom, n_cat, n_uni, n_costo, n_stock, n_min, n_prov, datetime.now().strftime("%Y-%m-%d %H:%M")))
-            conn.commit()
-            conn.close()
-            st.success("¡Insumo creado con éxito!")
-            st.rerun()
+                    if st.session_state.user['rol'] == 'Operador':
+                        st.error("⚠️ Los operadores no tienen permiso para eliminar insumos. Contacta al Administrador o Socio.")
+                    else:
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM insumos WHERE id = ?", (ins['id'],))
+                        cursor.execute("DELETE FROM recetas WHERE insumo_id = ?", (ins['id'],))
+                        conn.commit()
+                        conn.close()
+                        st.warning("Insumo eliminado del sistema.")
+                        st.rerun()
 
     conn.close()
 
 # ----------------------------------------------------
-# 3. PRODUCTOS Y RECETAS (CON EDICIÓN Y ELIMINACIÓN)
+# 3. PRODUCTOS Y RECETAS
 # ----------------------------------------------------
 elif menu == "🍔 Productos y Recetas":
-    st.markdown('<p class="main-header">🍔 Catálogo de Productos, Recetas y Costos</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Edita precios, descripciones o elimina productos libremente</p>', unsafe_allow_html=True)
-
+    st.markdown('<p class="main-header">🍔 Catálogo de Productos y Recetas</p>', unsafe_allow_html=True)
     conn = get_connection()
     productos_list = conn.execute("SELECT * FROM productos").fetchall()
 
     for prod in productos_list:
-        with st.expander(f"🥤 {prod['nombre']} - Venta: ${prod['precio_venta']:.2f} (Costo: ${prod['costo_calculado']:.2f})"):
+        with st.expander(f"🥤 {prod['nombre']} - Venta: ${prod['precio_venta']:.2f}"):
             with st.form(f"form_edit_prod_{prod['id']}"):
-                p_nom = st.text_input("Nombre del Producto", value=prod['nombre'], key=f"pn_{prod['id']}")
-                p_cat = st.text_input("Categoría", value=prod['categoria'], key=f"pc_{prod['id']}")
-                p_precio = st.number_input("Precio de Venta ($)", value=float(prod['precio_venta']), key=f"pp_{prod['id']}")
+                p_nom = st.text_input("Nombre", value=prod['nombre'], key=f"pn_{prod['id']}")
+                p_precio = st.number_input("Precio Venta ($)", value=float(prod['precio_venta']), key=f"pp_{prod['id']}")
                 p_desc = st.text_area("Descripción", value=str(prod['descripcion'] or ''), key=f"pd_{prod['id']}")
-
-                col_p1, col_p2 = st.columns(2)
-                with col_p1:
-                    b_save = st.form_submit_button("💾 Guardar Producto")
-                with col_p2:
-                    b_del = st.form_submit_button("❌ Eliminar Producto")
-
-                if b_save:
+                
+                if st.form_submit_button("💾 Actualizar Producto"):
                     cursor = conn.cursor()
-                    cursor.execute("""
-                    UPDATE productos SET nombre = ?, categoria = ?, precio_venta = ?, descripcion = ? WHERE id = ?
-                    """, (p_nom, p_cat, p_precio, p_desc, prod['id']))
+                    cursor.execute("UPDATE productos SET nombre = ?, precio_venta = ?, descripcion = ? WHERE id = ?", (p_nom, p_precio, p_desc, prod['id']))
                     conn.commit()
                     conn.close()
-                    st.success("¡Producto actualizado!")
+                    st.success("Actualizado con éxito")
                     st.rerun()
-
-                if b_del:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM productos WHERE id = ?", (prod['id'],))
-                    cursor.execute("DELETE FROM recetas WHERE producto_id = ?", (prod['id'],))
-                    conn.commit()
-                    conn.close()
-                    st.warning("Producto eliminado.")
-                    st.rerun()
-
-    st.markdown("---")
-    st.subheader("➕ Crear Nuevo Producto")
-    with st.form("nuevo_prod_form"):
-        np_nom = st.text_input("Nombre del Producto / Bebida")
-        np_cat = st.text_input("Categoría", value="Bebidas")
-        np_precio = st.number_input("Precio de Venta ($)", min_value=1.0, value=70.0)
-        np_desc = st.text_area("Descripción de preparación")
-
-        if st.form_submit_button("Crear Producto Base"):
-            cursor = conn.cursor()
-            cursor.execute("""
-            INSERT INTO productos (nombre, categoria, precio_venta, descripcion, activo)
-            VALUES (?, ?, ?, ?, 1)
-            """, (np_nom, np_cat, np_precio, np_desc))
-            conn.commit()
-            conn.close()
-            st.success("¡Producto creado con éxito!")
-            st.rerun()
-
     conn.close()
 
 # ----------------------------------------------------
@@ -331,107 +398,126 @@ elif menu == "🍔 Productos y Recetas":
 # ----------------------------------------------------
 elif menu == "🎁 Combos y Paquetes":
     st.markdown('<p class="main-header">🎁 Combos y Paquetes Estratégicos</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Gestión de paquetes promocionales</p>', unsafe_allow_html=True)
-
     conn = get_connection()
     combos = conn.execute("SELECT * FROM combos").fetchall()
-
     for combo in combos:
-        with st.expander(f"📦 {combo['nombre']} - Precio Combo: ${combo['precio_combo']:.2f}"):
-            with st.form(f"form_combo_{combo['id']}"):
-                c_nom = st.text_input("Nombre del Combo", value=combo['nombre'], key=f"cn_{combo['id']}")
-                c_desc = st.text_input("Descripción", value=combo['descripcion'], key=f"cd_{combo['id']}")
-                c_reg = st.number_input("Precio Regular ($)", value=float(combo['precio_regular']), key=f"cr_{combo['id']}")
-                c_com = st.number_input("Precio Combo ($)", value=float(combo['precio_combo']), key=f"cc_{combo['id']}")
-
-                b_sc = st.form_submit_button("💾 Actualizar Combo")
-                b_dc = st.form_submit_button("❌ Eliminar Combo")
-
-                if b_sc:
-                    desc_p = ((c_reg - c_com) / c_reg) * 100 if c_reg > 0 else 0
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                    UPDATE combos SET nombre = ?, descripcion = ?, precio_regular = ?, precio_combo = ?, descuento_porcentaje = ? WHERE id = ?
-                    """, (c_nom, c_desc, c_reg, c_com, desc_p, combo['id']))
-                    conn.commit()
-                    conn.close()
-                    st.success("¡Combo actualizado!")
-                    st.rerun()
-
-                if b_dc:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM combos WHERE id = ?", (combo['id'],))
-                    cursor.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo['id'],))
-                    conn.commit()
-                    conn.close()
-                    st.warning("Combo eliminado.")
-                    st.rerun()
-
+        st.write(f"**{combo['nombre']}** - Precio Combo: ${combo['precio_combo']:.2f} (Ahorro {combo['descuento_porcentaje']:.1f}%)")
     conn.close()
 
 # ----------------------------------------------------
-# 5. VENTAS Y FINANZAS
+# 5. CLIENTES Y DOMICILIOS
+# ----------------------------------------------------
+elif menu == "👥 Clientes y Domicilios":
+    st.markdown('<p class="main-header">👥 Directorio de Clientes y Servicio a Domicilio</p>', unsafe_allow_html=True)
+    conn = get_connection()
+    clientes = pd.read_sql("SELECT * FROM clientes", conn)
+    st.dataframe(clientes, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("➕ Registrar Nuevo Cliente")
+    with st.form("nuevo_cliente_form"):
+        ncl_nombre = st.text_input("Nombre del Cliente")
+        ncl_tel = st.text_input("Teléfono / WhatsApp")
+        ncl_dir = st.text_area("Dirección completa para entrega en moto")
+        ncl_notas = st.text_input("Referencias de ubicación o gustos")
+
+        if st.form_submit_button("Guardar Cliente"):
+            cur = conn.cursor()
+            cur.execute("INSERT INTO clientes (nombre, telefono, direccion, notas) VALUES (?, ?, ?, ?)", (ncl_nombre, ncl_tel, ncl_dir, ncl_notas))
+            conn.commit()
+            conn.close()
+            st.success("¡Cliente registrado con éxito!")
+            st.rerun()
+    conn.close()
+
+# ----------------------------------------------------
+# 6. VENTAS Y FINANZAS (HISTORIAL DIARIO, SEMANAL, MENSUAL)
 # ----------------------------------------------------
 elif menu == "💰 Ventas y Finanzas":
-    st.markdown('<p class="main-header">💰 Reporte de Ventas y Utilidades</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Historial de tickets cobrados y opción de eliminar tickets erróneos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">💰 Reporte de Ventas y Finanzas</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Filtros por periodo (Diario, Semanal, Mensual) y margen de utilidad</p>', unsafe_allow_html=True)
 
     conn = get_connection()
-    ventas = pd.read_sql("SELECT * FROM ventas ORDER BY fecha_hora DESC", conn)
+    ventas_df = pd.read_sql("SELECT * FROM ventas ORDER BY fecha_hora DESC", conn)
 
-    if len(ventas) > 0:
-        t_ingresos = ventas['total_venta'].sum()
-        t_costos = ventas['costo_total'].sum()
-        t_utilidad = ventas['utilidad_neta'].sum()
+    if len(ventas_df) > 0:
+        periodo = st.radio("Seleccionar Periodo de Reporte", ["Diario (Hoy)", "Semanal (Últimos 7 días)", "Mensual (Último mes)", "Histórico Completo"])
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Ingresos Totales", f"${t_ingresos:.2f}")
-        col2.metric("Costo de Venta Total", f"${t_costos:.2f}")
-        col3.metric("Utilidad Neta Acumulada", f"${t_utilidad:.2f}")
+        ventas_df['fecha_dt'] = pd.to_datetime(ventas_df['fecha_hora'])
+        hoy = datetime.now()
+
+        if periodo == "Diario (Hoy)":
+            ventas_filtradas = ventas_df[ventas_df['fecha_dt'].dt.date == hoy.date()]
+        elif periodo == "Semanal (Últimos 7 días)":
+            hace_7 = hoy - timedelta(days=7)
+            ventas_filtradas = ventas_df[ventas_df['fecha_dt'] >= hace_7]
+        elif periodo == "Mensual (Último mes)":
+            hace_30 = hoy - timedelta(days=30)
+            ventas_filtradas = ventas_df[ventas_df['fecha_dt'] >= hace_30]
+        else:
+            ventas_filtradas = ventas_df
+
+        t_ing = ventas_filtradas['total_venta'].sum()
+        t_cos = ventas_filtradas['costo_total'].sum()
+        t_util = ventas_filtradas['utilidad_neta'].sum()
+        margen_porc = (t_util / t_ing * 100) if t_ing > 0 else 0
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Ingresos Totales", f"${t_ing:.2f}")
+        c2.metric("Costos Totales", f"${t_cos:.2f}")
+        c3.metric("Utilidad Neta", f"${t_util:.2f}")
+        c4.metric("Margen de Utilidad", f"{margen_porc:.1f}%")
 
         st.markdown("---")
-        st.subheader("📋 Historial y Cancelación de Tickets")
-        ventas_raw = conn.execute("SELECT * FROM ventas ORDER BY fecha_hora DESC").fetchall()
-        for v in ventas_raw:
-            with st.expander(f"🎫 Folio: {v['folio']} | Fecha: {v['fecha_hora']} | Total: ${v['total_venta']:.2f}"):
-                st.write(f"**Método de Pago:** {v['metodo_pago']} | **Notas:** {v['notas']}")
-                st.write(f"**Costo:** ${v['costo_total']:.2f} | **Utilidad:** ${v['utilidad_neta']:.2f}")
-                
-                if st.button(f"❌ Cancelar / Eliminar Venta {v['folio']}", key=f"del_v_{v['id']}"):
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM ventas WHERE id = ?", (v['id'],))
-                    cursor.execute("DELETE FROM venta_detalles WHERE venta_id = ?", (v['id'],))
-                    conn.commit()
-                    conn.close()
-                    st.warning("Venta eliminada del historial.")
-                    st.rerun()
+        st.subheader("📋 Detalle de Tickets del Periodo")
+        st.dataframe(ventas_filtradas[['folio', 'fecha_hora', 'total_venta', 'costo_total', 'utilidad_neta', 'metodo_pago', 'notas']], use_container_width=True)
     else:
-        st.info("Aún no hay ventas registradas.")
-
+        st.info("No hay ventas registradas aún.")
     conn.close()
 
 # ----------------------------------------------------
-# 6. INVERSIONES Y GASTOS
+# 7. REPORTES Y UTILIDAD
 # ----------------------------------------------------
-elif menu == "📊 Inversiones y Gastos":
-    st.markdown('<p class="main-header">📊 Inversión Inicial y Gastos Operativos</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Control de capital invertido</p>', unsafe_allow_html=True)
-
+elif menu == "📊 Reportes y Utilidad":
+    st.markdown('<p class="main-header">📊 Análisis de Utilidad y Rendimiento</p>', unsafe_allow_html=True)
     conn = get_connection()
-    inversiones = pd.read_sql("SELECT * FROM inversiones", conn)
-    
-    if len(inversiones) > 0:
-        total_inversion = inversiones['monto'].sum()
-        st.metric("Inversión Total Inicial", f"${total_inversion:.2f}")
-        
-        for inv in conn.execute("SELECT * FROM inversiones").fetchall():
-            with st.expander(f"💡 {inv['concepto']} - ${inv['monto']:.2f} ({inv['fecha']})"):
-                if st.button(f"❌ Eliminar Inversión #{inv['id']}", key=f"del_inv_{inv['id']}"):
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM inversiones WHERE id = ?", (inv['id'],))
-                    conn.commit()
-                    conn.close()
-                    st.warning("Inversión eliminada.")
-                    st.rerun()
+    inversiones_total = conn.execute("SELECT SUM(monto) FROM inversiones").fetchone()[0] or 0.0
+    ventas_total = conn.execute("SELECT SUM(utilidad_neta) FROM ventas").fetchone()[0] or 0.0
 
+    st.metric("Inversión Inicial Total", f"${inversiones_total:.2f}")
+    st.metric("Utilidad Neta Generada Histórica", f"${ventas_total:.2f}")
+    
+    retorno = (ventas_total / inversiones_total * 100) if inversiones_total > 0 else 0
+    st.metric("Retorno de Inversión (ROI)", f"{retorno:.1f}%")
     conn.close()
+
+# ----------------------------------------------------
+# 8. GESTIÓN DE USUARIOS Y PERMISOS
+# ----------------------------------------------------
+elif menu == "⚙️ Gestión de Usuarios":
+    if st.session_state.user['rol'] != 'Administrador':
+        st.error("Acceso restringido solo al Administrador principal.")
+    else:
+        st.markdown('<p class="main-header">⚙️ Gestión de Usuarios y Permisos</p>', unsafe_allow_html=True)
+        conn = get_connection()
+        usuarios = pd.read_sql("SELECT id, username, rol, nombre FROM usuarios", conn)
+        st.dataframe(usuarios, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("➕ Crear Nuevo Usuario")
+        with st.form("nuevo_usuario_form"):
+            nu_user = st.text_input("Nombre de Usuario (login)")
+            nu_pass = st.text_input("Contraseña", type="password")
+            nu_rol = st.selectbox("Rol", ["Socio", "Operador"])
+            nu_nombre = st.text_input("Nombre Completo")
+
+            if st.form_submit_button("Crear Usuario"):
+                try:
+                    cur = conn.cursor()
+                    cur.execute("INSERT INTO usuarios (username, password, rol, nombre) VALUES (?, ?, ?, ?)", (nu_user, nu_pass, nu_rol, nu_nombre))
+                    conn.commit()
+                    st.success("¡Usuario creado con éxito!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: El nombre de usuario ya existe o datos inválidos.")
+        conn.close()
