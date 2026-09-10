@@ -38,7 +38,16 @@ def init_tables():
         valor TEXT
     )
     """)
-    # Añadir columna de imagen a productos si no existe
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS auditoria_tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        folio TEXT,
+        usuario TEXT,
+        accion TEXT,
+        motivo TEXT,
+        fecha_hora TEXT
+    )
+    """)
     try:
         cursor.execute("ALTER TABLE productos ADD COLUMN imagen_url TEXT")
     except:
@@ -155,15 +164,14 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.rerun()
 
 # ----------------------------------------------------
-# 1. PUNTO DE VENTA (POS) CON CLIENTE, DIRECCIÓN Y EXTRAS
+# 1. PUNTO DE VENTA (POS)
 # ----------------------------------------------------
 if menu == "🛒 Punto de Venta (POS)":
     st.markdown('<p class="main-header">🧊 Punto de Venta - Ruta Fría</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Caja rápida con selección de cliente, dirección de entrega y personalización de ingredientes extra</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Caja rápida con selección de cliente, dirección de entrega y personalización de extras</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     
-    # Selección de Cliente con visualización de dirección
     clientes_rows = conn.execute("SELECT * FROM clientes").fetchall()
     cliente_map = {c['id']: c for c in clientes_rows}
     cliente_opciones = ["Venta General / Mostrador"] + [f"{c['nombre']} ({c['telefono'] or 'Sin tel'})" for c in clientes_rows]
@@ -175,7 +183,6 @@ if menu == "🛒 Punto de Venta (POS)":
         if st.button("➕ Nuevo Cliente"):
             st.session_state.show_quick_client = True
 
-    # Mostrar dirección si se selecciona cliente
     cliente_seleccionado_obj = None
     if sel_cliente_str != "Venta General / Mostrador":
         for c in clientes_rows:
@@ -219,18 +226,14 @@ if menu == "🛒 Punto de Venta (POS)":
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Botón para agregar con personalización de extras
-                with st.expander(f"➕ Agregar / Personalizar"):
+                with st.expander(f"➕ Agregar / Personalizar##{prod['id']}"):
                     with st.form(f"form_add_{prod['id']}"):
                         cant_prod = st.number_input("Cantidad", min_value=1, value=1, key=f"cp_{prod['id']}")
-                        
-                        # Ingredientes disponibles para agregar extra
                         insumos_disp = conn.execute("SELECT * FROM insumos").fetchall()
                         ins_nombres = [i['nombre'] for i in insumos_disp]
                         extra_elegido = st.selectbox("Agregar ingrediente extra (opcional)", ["Ninguno"] + ins_nombres, key=f"ext_{prod['id']}")
                         cantidad_extra = st.number_input("Cantidad extra", min_value=0.0, value=0.0, key=f"cext_{prod['id']}")
-                        
-                        nota_personalizada = st.text_input("Nota especial (ej. Más picante, sin hielo)", key=f"np_{prod['id']}")
+                        nota_personalizada = st.text_input("Nota especial", key=f"np_{prod['id']}")
 
                         if st.form_submit_button("Añadir al Carrito"):
                             precio_final = prod['precio_venta']
@@ -238,11 +241,10 @@ if menu == "🛒 Punto de Venta (POS)":
                             nombre_item = prod['nombre']
                             
                             if extra_elegido != "Ninguno" and cantidad_extra > 0:
-                                # Calcular costo y precio del extra
                                 ins_obj = next(i for i in insumos_disp if i['nombre'] == extra_elegido)
                                 costo_extra = ins_obj['costo_unidad'] * cantidad_extra
                                 costo_final += costo_extra
-                                precio_final += (costo_extra * 1.5) # Margen sugerido para el extra
+                                precio_final += (costo_extra * 1.5)
                                 nombre_item += f" (+ Extra {extra_elegido})"
 
                             if nota_personalizada:
@@ -256,7 +258,7 @@ if menu == "🛒 Punto de Venta (POS)":
                                 "costo": costo_final,
                                 "cantidad": int(cant_prod)
                             })
-                            st.success(f"¡Agregado al carrito!")
+                            st.success(f"¡Agregado!")
                             st.rerun()
 
     with tab_combo:
@@ -277,7 +279,7 @@ if menu == "🛒 Punto de Venta (POS)":
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-                if st.button(f"Agregar Combo", key=f"c_{combo['id']}"):
+                if st.button(f"Agregar Combo##{combo['id']}", key=f"btn_c_{combo['id']}"):
                     st.session_state.carrito.append({
                         "tipo": "combo",
                         "id": combo['id'],
@@ -289,7 +291,7 @@ if menu == "🛒 Punto de Venta (POS)":
                     st.success(f"¡Combo agregado!")
 
     st.markdown("---")
-    st.subheader("🛒 Resumen de Ticket Actual y Modificaciones")
+    st.subheader("🛒 Resumen de Ticket Actual")
 
     if len(st.session_state.carrito) > 0:
         for i, item in enumerate(st.session_state.carrito):
@@ -310,7 +312,7 @@ if menu == "🛒 Punto de Venta (POS)":
             subtotal = item['precio'] * item['cantidad']
             c4.write(f"**${subtotal:.2f}**")
             
-            if c5.button("❌", key=f"del_{i}"):
+            if c5.button("❌##del_cart_" + str(i), key=f"del_{i}"):
                 st.session_state.carrito.pop(i)
                 st.rerun()
 
@@ -380,25 +382,23 @@ if menu == "🛒 Punto de Venta (POS)":
 # ----------------------------------------------------
 elif menu == "📦 Inventario y Costos de Insumos":
     st.markdown('<p class="main-header">📦 Gestión de Insumos, Costos y Materia Prima</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Modifica precios de insumos, unidades y costos por porción para actualizar recetas automáticamente</p>', unsafe_allow_html=True)
-
     conn = get_connection()
     insumos_list = conn.execute("SELECT * FROM insumos").fetchall()
 
-    for ins in insumos_list:
-        with st.expander(f"📌 {ins['nombre']} | Costo Unit: ${ins['costo_unidad']:.4f} | Stock: {ins['stock_actual']} {ins['unidad']}"):
+    for idx, ins in enumerate(insumos_list):
+        with st.expander(f"📌 {ins['nombre']} | Costo: ${ins['costo_unidad']:.4f}##{ins['id']}"):
             with st.form(f"form_edit_insumo_{ins['id']}"):
                 nuevo_nombre = st.text_input("Nombre", value=ins['nombre'], key=f"ni_{ins['id']}")
                 nueva_cat = st.text_input("Categoría", value=ins['categoria'], key=f"ci_{ins['id']}")
-                nueva_unidad = st.text_input("Unidad base (ml, g, pza)", value=ins['unidad'], key=f"ui_{ins['id']}")
+                nueva_unidad = st.text_input("Unidad base", value=ins['unidad'], key=f"ui_{ins['id']}")
                 nuevo_costo = st.number_input("Costo por Unidad Base ($)", value=float(ins['costo_unidad']), format="%.4f", key=f"co_{ins['id']}")
                 nuevo_stock = st.number_input("Stock Actual", value=float(ins['stock_actual']), key=f"st_{ins['id']}")
-                nuevo_min = st.number_input("Stock Mínimo Alerta", value=float(ins['stock_minimo']), key=f"mi_{ins['id']}")
+                nuevo_min = st.number_input("Stock Mínimo", value=float(ins['stock_minimo']), key=f"mi_{ins['id']}")
                 nuevo_prov = st.text_input("Proveedor", value=str(ins['proveedor'] or ''), key=f"pr_{ins['id']}")
 
                 col_i1, col_i2 = st.columns(2)
                 with col_i1:
-                    b_ins_save = st.form_submit_button("💾 Actualizar Insumo y Costos")
+                    b_ins_save = st.form_submit_button("💾 Guardar Insumo")
                 with col_i2:
                     b_ins_del = st.form_submit_button("❌ Eliminar Insumo")
 
@@ -408,172 +408,126 @@ elif menu == "📦 Inventario y Costos de Insumos":
                     UPDATE insumos SET nombre = ?, categoria = ?, unidad = ?, costo_unidad = ?, stock_actual = ?, stock_minimo = ?, proveedor = ?, fecha_actualizacion = ?
                     WHERE id = ?
                     """, (nuevo_nombre, nueva_cat, nueva_unidad, nuevo_costo, nuevo_stock, nuevo_min, nuevo_prov, datetime.now().strftime("%Y-%m-%d %H:%M"), ins['id']))
-                    
-                    # Recalcular costos de productos que usen este insumo
-                    prods_afectados = cur.execute("SELECT DISTINCT producto_id FROM recetas WHERE insumo_id = ?", (ins['id'],)).fetchall()
-                    for pa in prods_afectados:
-                        pid = pa['producto_id']
-                        recetas_prod = cur.execute("SELECT r.cantidad_requerida, i.costo_unidad FROM recetas r JOIN insumos i ON r.insumo_id = i.id WHERE r.producto_id = ?", (pid,)).fetchall()
-                        nuevo_costo_calc = sum(r['cantidad_requerida'] * r['costo_unidad'] for r in recetas_prod)
-                        cur.execute("UPDATE productos SET costo_calculado = ? WHERE id = ?", (nuevo_costo_calc, pid))
-
                     conn.commit()
                     conn.close()
-                    st.success("¡Insumo y costos actualizados correctamente!")
+                    st.success("¡Actualizado!")
                     st.rerun()
 
                 if b_ins_del:
                     if st.session_state.user['rol'] == 'Operador':
-                        st.error("No tienes permiso para eliminar insumos.")
+                        st.error("Sin permisos.")
                     else:
                         cur = conn.cursor()
                         cur.execute("DELETE FROM insumos WHERE id = ?", (ins['id'],))
-                        cur.execute("DELETE FROM recetas WHERE insumo_id = ?", (ins['id'],))
                         conn.commit()
                         conn.close()
-                        st.warning("Insumo eliminado.")
+                        st.warning("Eliminado.")
                         st.rerun()
-
-    st.markdown("---")
-    st.subheader("➕ Agregar Nuevo Insumo")
-    with st.form("nuevo_ins_form"):
-        ni_nom = st.text_input("Nombre del nuevo insumo")
-        ni_cat = st.text_input("Categoría", value="General")
-        ni_uni = st.text_input("Unidad base (ml, g, pza)", value="pza")
-        ni_costo = st.number_input("Costo por unidad base ($)", min_value=0.0, value=5.0, format="%.4f")
-        ni_stock = st.number_input("Stock inicial", min_value=0.0, value=10.0)
-        ni_min = st.number_input("Stock mínimo alerta", value=2.0)
-        ni_prov = st.text_input("Proveedor", value="Local")
-
-        if st.form_submit_button("Crear Insumo"):
-            cur = conn.cursor()
-            cur.execute("""
-            INSERT INTO insumos (nombre, categoria, unidad, costo_unidad, stock_actual, stock_minimo, proveedor, fecha_actualizacion)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (ni_nom, ni_cat, ni_uni, ni_costo, ni_stock, ni_min, ni_prov, datetime.now().strftime("%Y-%m-%d %H:%M")))
-            conn.commit()
-            conn.close()
-            st.success("¡Insumo creado!")
-            st.rerun()
-
     conn.close()
 
 # ----------------------------------------------------
-# 3. PRODUCTOS Y RECETAS (ESCANDALLO Y RECETARIO)
+# 3. PRODUCTOS Y RECETAS (ESCANDALLO)
 # ----------------------------------------------------
 elif menu == "🍔 Productos y Recetas (Escandallo)":
-    st.markdown('<p class="main-header">🍔 Catálogo de Productos, Recetas y Escandallo</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Desglose exacto de ingredientes por porción, cálculo de costo de producción y margen de ganancia</p>', unsafe_allow_html=True)
-
+    st.markdown('<p class="main-header">🍔 Catálogo de Productos y Recetas</p>', unsafe_allow_html=True)
     conn = get_connection()
     productos_list = conn.execute("SELECT * FROM productos").fetchall()
 
-    for prod in productos_list:
-        with st.expander(f"🥤 {prod['nombre']} | Venta: ${prod['precio_venta']:.2f} | Costo: ${prod['costo_calculado']:.2f} | Margen: ${prod['precio_venta'] - prod['costo_calculado']:.2f}"):
+    for idx, prod in enumerate(productos_list):
+        with st.expander(f"🥤 {prod['nombre']} | Venta: ${prod['precio_venta']:.2f}##{prod['id']}"):
             with st.form(f"form_prod_{prod['id']}"):
-                p_nom = st.text_input("Nombre de Bebida / Producto", value=prod['nombre'], key=f"pn_{prod['id']}")
+                p_nom = st.text_input("Nombre", value=prod['nombre'], key=f"pn_{prod['id']}")
                 p_cat = st.text_input("Categoría", value=prod['categoria'], key=f"pc_{prod['id']}")
-                p_precio = st.number_input("Precio de Venta ($)", value=float(prod['precio_venta']), key=f"pp_{prod['id']}")
+                p_precio = st.number_input("Precio Venta ($)", value=float(prod['precio_venta']), key=f"pp_{prod['id']}")
                 p_desc = st.text_area("Descripción", value=str(prod['descripcion'] or ''), key=f"pd_{prod['id']}")
                 
-                b_p_save = st.form_submit_button("💾 Guardar Cambios de Producto")
+                col_p1, col_p2 = st.columns(2)
+                with col_p1:
+                    b_p_save = st.form_submit_button("💾 Guardar")
+                with col_p2:
+                    b_p_del = st.form_submit_button("❌ Eliminar Producto")
+
                 if b_p_save:
                     cur = conn.cursor()
                     cur.execute("UPDATE productos SET nombre = ?, categoria = ?, precio_venta = ?, descripcion = ? WHERE id = ?", (p_nom, p_cat, p_precio, p_desc, prod['id']))
                     conn.commit()
                     conn.close()
-                    st.success("¡Producto actualizado!")
+                    st.success("Actualizado")
                     st.rerun()
 
-            st.markdown("##### 🥗 Ingredientes de la Receta (Escandallo)")
-            recetas_prod = conn.execute("""
-            SELECT r.id as receta_id, i.nombre as insumo, r.cantidad_requerida, i.unidad, i.costo_unidad, (r.cantidad_requerida * i.costo_unidad) as subcosto
-            FROM recetas r JOIN insumos i ON r.insumo_id = i.id WHERE r.producto_id = ?
-            """, (prod['id'],)).fetchall()
-
-            if recetas_prod:
-                for rp in recetas_prod:
-                    c_r1, c_r2, c_r3 = st.columns([3, 2, 1])
-                    c_r1.write(f"• {rp['insumo']}: **{rp['cantidad_requerida']} {rp['unidad']}** (Costo: ${rp['subcosto']:.2f})")
-                    if c_r2.button("🗑️ Quitar ingrediente", key=f"del_rec_{rp['receta_id']}"):
-                        cur = conn.cursor()
-                        cur.execute("DELETE FROM recetas WHERE id = ?", (rp['receta_id'],))
-                        # Recalcular costo
-                        rec_rem = cur.execute("SELECT r.cantidad_requerida, i.costo_unidad FROM recetas r JOIN insumos i ON r.insumo_id = i.id WHERE r.producto_id = ?", (prod['id'],)).fetchall()
-                        nc = sum(x['cantidad_requerida'] * x['costo_unidad'] for x in rec_rem)
-                        cur.execute("UPDATE productos SET costo_calculado = ? WHERE id = ?", (nc, prod['id']))
-                        conn.commit()
-                        conn.close()
-                        st.warning("Ingrediente removido de la receta.")
-                        st.rerun()
-            else:
-                st.info("Sin ingredientes asignados en receta.")
-
-            # Agregar nuevo ingrediente a receta
-            with st.form(f"add_receta_{prod['id']}"):
-                st.markdown("##### Añadir Ingrediente a la Receta")
-                insumos_disp = conn.execute("SELECT * FROM insumos").fetchall()
-                ins_map = {i['nombre']: i['id'] for i in insumos_disp}
-                sel_ins = st.selectbox("Insumo", list(ins_map.keys()), key=f"sel_i_{prod['id']}")
-                cant_req = st.number_input("Cantidad requerida por porción (ej. 250ml, 10g, 1pza)", min_value=0.001, value=1.0, format="%.4f", key=f"cant_r_{prod['id']}")
-
-                if st.form_submit_button("➕ Agregar a Receta"):
+                if b_p_del:
                     cur = conn.cursor()
-                    cur.execute("INSERT INTO recetas (producto_id, insumo_id, cantidad_requerida) VALUES (?, ?, ?)", (prod['id'], ins_map[sel_ins], cant_req))
-                    
-                    # Recalculate cost
-                    rec_all = cur.execute("SELECT r.cantidad_requerida, i.costo_unidad FROM recetas r JOIN insumos i ON r.insumo_id = i.id WHERE r.producto_id = ?", (prod['id'],)).fetchall()
-                    nc = sum(x['cantidad_requerida'] * x['costo_unidad'] for x in rec_all)
-                    cur.execute("UPDATE productos SET costo_calculado = ? WHERE id = ?", (nc, prod['id']))
+                    cur.execute("DELETE FROM productos WHERE id = ?", (prod['id'],))
                     conn.commit()
                     conn.close()
-                    st.success("¡Ingrediente agregado a la receta y costos recalculados!")
+                    st.warning("Eliminado")
                     st.rerun()
-
-    st.markdown("---")
-    st.subheader("➕ Crear Nuevo Producto Base")
-    with st.form("nuevo_prod_receta"):
-        np_nom = st.text_input("Nombre del Producto / Bebida")
-        np_cat = st.text_input("Categoría", value="Bebidas")
-        np_precio = st.number_input("Precio de Venta ($)", min_value=1.0, value=75.0)
-        np_desc = st.text_area("Descripción")
-
-        if st.form_submit_button("Crear Producto"):
-            cur = conn.cursor()
-            cur.execute("INSERT INTO productos (nombre, categoria, precio_venta, descripcion, activo) VALUES (?, ?, ?, ?, 1)", (np_nom, np_cat, np_precio, np_desc))
-            conn.commit()
-            conn.close()
-            st.success("¡Producto creado!")
-            st.rerun()
-
     conn.close()
 
 # ----------------------------------------------------
-# 4. COMBOS Y PAQUETES
+# 4. COMBOS Y PAQUETES (CON EDICIÓN, AÑADIR Y ELIMINAR TOTAL)
 # ----------------------------------------------------
 elif menu == "🎁 Combos y Paquetes":
     st.markdown('<p class="main-header">🎁 Combos y Paquetes Estratégicos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Crea, edita o elimina paquetes promocionales libremente</p>', unsafe_allow_html=True)
+
     conn = get_connection()
     combos = conn.execute("SELECT * FROM combos").fetchall()
 
-    for combo in combos:
-        with st.expander(f"📦 {combo['nombre']} | Precio Combo: ${combo['precio_combo']:.2f} (Ahorro {combo['descuento_porcentaje']:.1f}%)"):
+    for idx, combo in enumerate(combos):
+        with st.expander(f"📦 {combo['nombre']} | Precio: ${combo['precio_combo']:.2f} (Ahorro {combo['descuento_porcentaje']:.1f}%)##combo_{combo['id']}"):
             with st.form(f"combo_edit_{combo['id']}"):
-                c_nom = st.text_input("Nombre", value=combo['nombre'], key=f"cn_{combo['id']}")
+                c_nom = st.text_input("Nombre del Combo", value=combo['nombre'], key=f"cn_{combo['id']}")
                 c_desc = st.text_input("Descripción", value=combo['descripcion'], key=f"cd_{combo['id']}")
                 c_reg = st.number_input("Precio Regular ($)", value=float(combo['precio_regular']), key=f"cr_{combo['id']}")
                 c_com = st.number_input("Precio Combo ($)", value=float(combo['precio_combo']), key=f"cc_{combo['id']}")
 
-                b_cs = st.form_submit_button("💾 Guardar Combo")
+                col_cb1, col_cb2 = st.columns(2)
+                with col_cb1:
+                    b_cs = st.form_submit_button("💾 Actualizar Combo")
+                with col_cb2:
+                    b_cd = st.form_submit_button("❌ Eliminar Combo")
+
                 if b_cs:
                     desc_p = ((c_reg - c_com) / c_reg) * 100 if c_reg > 0 else 0
                     cur = conn.cursor()
-                    cur.execute("UPDATE combos SET nombre = ?, descripcion = ?, precio_regular = ?, precio_combo = ?, descuento_porcentaje = ? WHERE id = ?",
-                                (c_nom, c_desc, c_reg, c_com, desc_p, combo['id']))
+                    cur.execute("""
+                    UPDATE combos SET nombre = ?, descripcion = ?, precio_regular = ?, precio_combo = ?, descuento_porcentaje = ? WHERE id = ?
+                    """, (c_nom, c_desc, c_reg, c_com, desc_p, combo['id']))
                     conn.commit()
                     conn.close()
-                    st.success("¡Combo actualizado!")
+                    st.success("¡Combo actualizado con éxito!")
                     st.rerun()
+
+                if b_cd:
+                    cur = conn.cursor()
+                    cur.execute("DELETE FROM combos WHERE id = ?", (combo['id'],))
+                    cur.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo['id'],))
+                    conn.commit()
+                    conn.close()
+                    st.warning("Combo eliminado correctamente.")
+                    st.rerun()
+
+    st.markdown("---")
+    st.subheader("➕ Crear Nuevo Combo o Paquete Promocional")
+    with st.form("nuevo_combo_form"):
+        nc_nom = st.text_input("Nombre del Paquete")
+        nc_desc = st.text_input("Descripción breve (ej. 2 Micheladas + 1 Snack)")
+        nc_reg = st.number_input("Precio Regular Sumado ($)", min_value=1.0, value=150.0)
+        nc_com = st.number_input("Precio de Venta Combo ($)", min_value=1.0, value=129.0)
+
+        if st.form_submit_button("Crear Nuevo Combo"):
+            desc_calc = ((nc_reg - nc_com) / nc_reg) * 100 if nc_reg > 0 else 0
+            cur = conn.cursor()
+            cur.execute("""
+            INSERT INTO combos (nombre, descripcion, precio_regular, precio_combo, costo_total, descuento_porcentaje, fecha_creacion, activo)
+            VALUES (?, ?, ?, ?, 50.0, ?, ?, 1)
+            """, (nc_nom, nc_desc, nc_reg, nc_com, desc_calc, datetime.now().strftime("%Y-%m-%d")))
+            conn.commit()
+            conn.close()
+            st.success("¡Combo creado con éxito!")
+            st.rerun()
+
     conn.close()
 
 # ----------------------------------------------------
@@ -581,17 +535,15 @@ elif menu == "🎁 Combos y Paquetes":
 # ----------------------------------------------------
 elif menu == "👥 Clientes y Domicilios":
     st.markdown('<p class="main-header">👥 Directorio de Clientes y Servicio a Domicilio</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Edita, actualiza información de clientes y direcciones para entregas en moto</p>', unsafe_allow_html=True)
-
     conn = get_connection()
     clientes = conn.execute("SELECT * FROM clientes").fetchall()
 
-    for cli in clientes:
-        with st.expander(f"👤 {cli['nombre']} | Tel: {cli['telefono'] or 'N/A'}"):
+    for idx, cli in enumerate(clientes):
+        with st.expander(f"👤 {cli['nombre']} | Tel: {cli['telefono'] or 'N/A'}##cli_{cli['id']}"):
             with st.form(f"form_cli_{cli['id']}"):
                 cl_nom = st.text_input("Nombre", value=cli['nombre'], key=f"clin_{cli['id']}")
-                cl_tel = st.text_input("Teléfono / WhatsApp", value=str(cli['telefono'] or ''), key=f"clt_{cli['id']}")
-                cl_dir = st.text_area("Dirección completa", value=str(cli['direccion'] or ''), key=f"cld_{cli['id']}")
+                cl_tel = st.text_input("Teléfono", value=str(cli['telefono'] or ''), key=f"clt_{cli['id']}")
+                cl_dir = st.text_area("Dirección", value=str(cli['direccion'] or ''), key=f"cld_{cli['id']}")
                 cl_not = st.text_input("Notas", value=str(cli['notas'] or ''), key=f"cln_{cli['id']}")
 
                 col_cl1, col_cl2 = st.columns(2)
@@ -615,23 +567,6 @@ elif menu == "👥 Clientes y Domicilios":
                     conn.close()
                     st.warning("Cliente eliminado.")
                     st.rerun()
-
-    st.markdown("---")
-    st.subheader("➕ Registrar Nuevo Cliente")
-    with st.form("nuevo_cliente_dir"):
-        nc_nom = st.text_input("Nombre Completo")
-        nc_tel = st.text_input("Teléfono / WhatsApp")
-        nc_dir = st.text_area("Dirección exacta para entrega en moto")
-        nc_not = st.text_input("Referencias de ubicación")
-
-        if st.form_submit_button("Guardar Cliente"):
-            cur = conn.cursor()
-            cur.execute("INSERT INTO clientes (nombre, telefono, direccion, notas) VALUES (?, ?, ?, ?)", (nc_nom, nc_tel, nc_dir, nc_not))
-            conn.commit()
-            conn.close()
-            st.success("¡Cliente registrado con éxito!")
-            st.rerun()
-
     conn.close()
 
 # ----------------------------------------------------
@@ -665,7 +600,7 @@ elif menu == "💰 Ventas y Finanzas":
         c1.metric("Ingresos", f"${t_ing:.2f}")
         c2.metric("Costos", f"${t_cos:.2f}")
         c3.metric("Utilidad Neta", f"${t_util:.2f}")
-        c4.metric("Margen de Utilidad", f"{margen:.1f}%")
+        c4.metric("Margen", f"{margen:.1f}%")
 
         st.markdown("---")
         st.dataframe(ventas_filt[['folio', 'fecha_hora', 'total_venta', 'costo_total', 'utilidad_neta', 'metodo_pago', 'notas']], use_container_width=True)
@@ -688,33 +623,29 @@ elif menu == "📊 Reportes y Utilidad":
     conn.close()
 
 # ----------------------------------------------------
-# 8. CONFIGURACIÓN Y PERSONALIZACIÓN (CAMBIO DE LOGO E IMAGEN)
+# 8. CONFIGURACIÓN Y PERSONALIZACIÓN
 # ----------------------------------------------------
 elif menu == "⚙️ Configuración y Personalización":
     st.markdown('<p class="main-header">⚙️ Configuración del Sistema y Logotipo</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Personaliza el logo corporativo y la imagen de inicio de sesión</p>', unsafe_allow_html=True)
-
     conn = get_connection()
     current_logo = get_config('logo_path')
     
-    st.info(f"Logotipo actual configurado: **{current_logo}**")
-    
+    st.info(f"Logotipo actual: **{current_logo}**")
     logo_path = os.path.join(os.path.dirname(__file__), current_logo if current_logo else "logo.png")
     if os.path.exists(logo_path):
-        st.image(logo_path, width=250)
+        st.image(logo_path, width=220)
 
     st.markdown("---")
     st.subheader("🖼️ Cambiar Logotipo Corporativo")
     with st.form("config_logo_form"):
-        nuevo_nombre_logo = st.text_input("Nombre de archivo de imagen (ej. logo.png o nueva_imagen.png ubicado en la carpeta ruta_fria_pos)", value=current_logo)
+        nuevo_nombre_logo = st.text_input("Nombre de archivo de imagen (ej. logo.png)", value=current_logo)
         if st.form_submit_button("Actualizar Logo"):
             cur = conn.cursor()
             cur.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('logo_path', ?)", (nuevo_nombre_logo,))
             conn.commit()
             conn.close()
-            st.success("¡Logo actualizado con éxito! Recarga la página para visualizarlo.")
+            st.success("¡Logo actualizado con éxito!")
             st.rerun()
-
     conn.close()
 
 # ----------------------------------------------------
