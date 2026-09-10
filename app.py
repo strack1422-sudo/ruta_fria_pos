@@ -48,6 +48,15 @@ def init_tables():
         fecha_hora TEXT
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS permisos_rol (
+        rol TEXT PRIMARY KEY,
+        puede_vender INTEGER,
+        puede_editar_inventario INTEGER,
+        puede_ver_finanzas INTEGER,
+        puede_gestionar_usuarios INTEGER
+    )
+    """)
     try:
         cursor.execute("ALTER TABLE productos ADD COLUMN imagen_url TEXT")
     except:
@@ -57,6 +66,12 @@ def init_tables():
     cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('admin', '1234', 'Administrador', 'Fernando (Dueño)')")
     cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('socio', '1234', 'Socio', 'Socio Ruta Fría')")
     cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('cajero', '1234', 'Operador', 'Personal de Caja')")
+    
+    # Permisos por defecto
+    cursor.execute("INSERT OR IGNORE INTO permisos_rol (rol, puede_vender, puede_editar_inventario, puede_ver_finanzas, puede_gestionar_usuarios) VALUES ('Administrador', 1, 1, 1, 1)")
+    cursor.execute("INSERT OR IGNORE INTO permisos_rol (rol, puede_vender, puede_editar_inventario, puede_ver_finanzas, puede_gestionar_usuarios) VALUES ('Socio', 1, 1, 1, 0)")
+    cursor.execute("INSERT OR IGNORE INTO permisos_rol (rol, puede_vender, puede_editar_inventario, puede_ver_finanzas, puede_gestionar_usuarios) VALUES ('Operador', 1, 0, 0, 0)")
+
     conn.commit()
     conn.close()
 
@@ -68,7 +83,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS personalizados
 st.markdown("""
 <style>
     .main-header {
@@ -85,7 +99,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# GESTIÓN DE SESIÓN Y LOGIN
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -94,6 +107,16 @@ def get_config(clave):
     row = conn.execute("SELECT valor FROM configuracion WHERE clave = ?", (clave,)).fetchone()
     conn.close()
     return row['valor'] if row else None
+
+def verificar_permiso(permiso_key):
+    if not st.session_state.user:
+        return False
+    if st.session_state.user['rol'] == 'Administrador':
+        return True
+    conn = get_connection()
+    row = conn.execute(f"SELECT {permiso_key} FROM permisos_rol WHERE rol = ?", (st.session_state.user['rol'],)).fetchone()
+    conn.close()
+    return bool(row[permiso_key]) if row else False
 
 if st.session_state.user is None:
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -130,7 +153,7 @@ if st.session_state.user is None:
                     st.error("Usuario o contraseña incorrectos.")
     st.stop()
 
-# Menú lateral con Logo y Perfil
+# Menú lateral
 logo_file = get_config('logo_path')
 logo_path = os.path.join(os.path.dirname(__file__), logo_file if logo_file else "logo.png")
 if os.path.exists(logo_path):
@@ -142,19 +165,28 @@ st.sidebar.title("Ruta Fría POS")
 st.sidebar.markdown(f"👤 **{st.session_state.user['nombre']}**\n\n🛡️ Rol: *{st.session_state.user['rol']}*")
 st.sidebar.markdown("---")
 
-menu_options = [
-    "🛒 Punto de Venta (POS)", 
-    "📦 Inventario y Costos de Insumos", 
-    "🍔 Productos y Recetas (Escandallo)", 
-    "🎁 Combos y Paquetes", 
-    "👥 Clientes y Domicilios", 
-    "💰 Ventas y Finanzas", 
-    "📊 Reportes y Utilidad",
-    "⚙️ Configuración y Personalización"
-]
+menu_options = []
+if verificar_permiso('puede_vender'):
+    menu_options.append("🛒 Punto de Venta (POS)")
+if verificar_permiso('puede_editar_inventario'):
+    menu_options.extend([
+        "📦 Inventario y Costos de Insumos", 
+        "🍔 Productos y Recetas (Escandallo)", 
+        "🎁 Combos y Paquetes"
+    ])
 
-if st.session_state.user['rol'] == 'Administrador':
-    menu_options.append("👥 Gestión de Usuarios")
+menu_options.append("👥 Clientes y Domicilios")
+
+if verificar_permiso('puede_ver_finanzas'):
+    menu_options.extend([
+        "💰 Ventas y Finanzas", 
+        "📊 Reportes, Utilidad y Balances"
+    ])
+
+menu_options.append("⚙️ Configuración y Personalización")
+
+if verificar_permiso('puede_gestionar_usuarios'):
+    menu_options.append("👥 Gestión de Usuarios y Permisos")
 
 menu = st.sidebar.radio("Navegación", menu_options)
 
@@ -171,9 +203,7 @@ if menu == "🛒 Punto de Venta (POS)":
     st.markdown('<p class="sub-header">Caja rápida con selección de cliente, dirección de entrega y personalización de extras</p>', unsafe_allow_html=True)
 
     conn = get_connection()
-    
     clientes_rows = conn.execute("SELECT * FROM clientes").fetchall()
-    cliente_map = {c['id']: c for c in clientes_rows}
     cliente_opciones = ["Venta General / Mostrador"] + [f"{c['nombre']} ({c['telefono'] or 'Sin tel'})" for c in clientes_rows]
     
     col_c1, col_c2 = st.columns([2, 1])
@@ -231,7 +261,7 @@ if menu == "🛒 Punto de Venta (POS)":
                         cant_prod = st.number_input("Cantidad", min_value=1, value=1, key=f"cp_{prod['id']}")
                         insumos_disp = conn.execute("SELECT * FROM insumos").fetchall()
                         ins_nombres = [i['nombre'] for i in insumos_disp]
-                        extra_elegido = st.selectbox("Agregar ingrediente extra (opcional)", ["Ninguno"] + ins_nombres, key=f"ext_{prod['id']}")
+                        extra_elegido = st.selectbox("Agregar ingrediente extra", ["Ninguno"] + ins_nombres, key=f"ext_{prod['id']}")
                         cantidad_extra = st.number_input("Cantidad extra", min_value=0.0, value=0.0, key=f"cext_{prod['id']}")
                         nota_personalizada = st.text_input("Nota especial", key=f"np_{prod['id']}")
 
@@ -465,12 +495,10 @@ elif menu == "🍔 Productos y Recetas (Escandallo)":
     conn.close()
 
 # ----------------------------------------------------
-# 4. COMBOS Y PAQUETES (CON EDICIÓN, AÑADIR Y ELIMINAR TOTAL)
+# 4. COMBOS Y PAQUETES
 # ----------------------------------------------------
 elif menu == "🎁 Combos y Paquetes":
     st.markdown('<p class="main-header">🎁 Combos y Paquetes Estratégicos</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Crea, edita o elimina paquetes promocionales libremente</p>', unsafe_allow_html=True)
-
     conn = get_connection()
     combos = conn.execute("SELECT * FROM combos").fetchall()
 
@@ -491,43 +519,20 @@ elif menu == "🎁 Combos y Paquetes":
                 if b_cs:
                     desc_p = ((c_reg - c_com) / c_reg) * 100 if c_reg > 0 else 0
                     cur = conn.cursor()
-                    cur.execute("""
-                    UPDATE combos SET nombre = ?, descripcion = ?, precio_regular = ?, precio_combo = ?, descuento_porcentaje = ? WHERE id = ?
-                    """, (c_nom, c_desc, c_reg, c_com, desc_p, combo['id']))
+                    cur.execute("UPDATE combos SET nombre = ?, descripcion = ?, precio_regular = ?, precio_combo = ?, descuento_porcentaje = ? WHERE id = ?",
+                                (c_nom, c_desc, c_reg, c_com, desc_p, combo['id']))
                     conn.commit()
                     conn.close()
-                    st.success("¡Combo actualizado con éxito!")
+                    st.success("¡Combo actualizado!")
                     st.rerun()
 
                 if b_cd:
                     cur = conn.cursor()
                     cur.execute("DELETE FROM combos WHERE id = ?", (combo['id'],))
-                    cur.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo['id'],))
                     conn.commit()
                     conn.close()
-                    st.warning("Combo eliminado correctamente.")
+                    st.warning("Combo eliminado.")
                     st.rerun()
-
-    st.markdown("---")
-    st.subheader("➕ Crear Nuevo Combo o Paquete Promocional")
-    with st.form("nuevo_combo_form"):
-        nc_nom = st.text_input("Nombre del Paquete")
-        nc_desc = st.text_input("Descripción breve (ej. 2 Micheladas + 1 Snack)")
-        nc_reg = st.number_input("Precio Regular Sumado ($)", min_value=1.0, value=150.0)
-        nc_com = st.number_input("Precio de Venta Combo ($)", min_value=1.0, value=129.0)
-
-        if st.form_submit_button("Crear Nuevo Combo"):
-            desc_calc = ((nc_reg - nc_com) / nc_reg) * 100 if nc_reg > 0 else 0
-            cur = conn.cursor()
-            cur.execute("""
-            INSERT INTO combos (nombre, descripcion, precio_regular, precio_combo, costo_total, descuento_porcentaje, fecha_creacion, activo)
-            VALUES (?, ?, ?, ?, 50.0, ?, ?, 1)
-            """, (nc_nom, nc_desc, nc_reg, nc_com, desc_calc, datetime.now().strftime("%Y-%m-%d")))
-            conn.commit()
-            conn.close()
-            st.success("¡Combo creado con éxito!")
-            st.rerun()
-
     conn.close()
 
 # ----------------------------------------------------
@@ -609,18 +614,73 @@ elif menu == "💰 Ventas y Finanzas":
     conn.close()
 
 # ----------------------------------------------------
-# 7. REPORTES Y UTILIDAD
+# 7. REPORTES, UTILIDAD Y BALANCES (CON CALENDARIO Y RANGO PERSONALIZADO)
 # ----------------------------------------------------
-elif menu == "📊 Reportes y Utilidad":
-    st.markdown('<p class="main-header">📊 Análisis de Rendimiento y Utilidad</p>', unsafe_allow_html=True)
-    conn = get_connection()
-    inv = conn.execute("SELECT SUM(monto) FROM inversiones").fetchone()[0] or 0.0
-    util = conn.execute("SELECT SUM(utilidad_neta) FROM ventas").fetchone()[0] or 0.0
+elif menu == "📊 Reportes, Utilidad y Balances":
+    st.markdown('<p class="main-header">📊 Análisis Financiero, Balances y Reportes por Rango de Fechas</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Selecciona un calendario con rango personalizado de fechas para calcular ingresos, utilidad y balance neto</p>', unsafe_allow_html=True)
 
-    st.metric("Inversión Inicial Total", f"${inv:.2f}")
-    st.metric("Utilidad Neta Histórica Acumulada", f"${util:.2f}")
-    st.metric("Retorno de Inversión (ROI)", f"{(util/inv*100):.1f}%" if inv > 0 else "0.0%")
+    conn = get_connection()
+    ventas_df = pd.read_sql("SELECT * FROM ventas", conn)
+    inversiones_df = pd.read_sql("SELECT * FROM inversiones", conn)
     conn.close()
+
+    # Selector de Rango de Fechas con Calendario
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        fecha_inicio = st.date_input("📅 Fecha de Inicio", value=datetime.now().date() - timedelta(days=30))
+    with col_d2:
+        fecha_fin = st.date_input("📅 Fecha de Fin", value=datetime.now().date())
+
+    if len(ventas_df) > 0:
+        ventas_df['fecha_dt'] = pd.to_datetime(ventas_df['fecha_hora']).dt.date
+        mask_v = (ventas_df['fecha_dt'] >= fecha_inicio) & (ventas_df['fecha_dt'] <= fecha_fin)
+        ventas_rango = ventas_df.loc[mask_v]
+
+        total_ingresos = ventas_rango['total_venta'].sum()
+        total_costo_ventas = ventas_rango['costo_total'].sum()
+        utilidad_bruta = ventas_rango['utilidad_neta'].sum()
+    else:
+        ventas_rango = pd.DataFrame()
+        total_ingresos = 0.0
+        total_costo_ventas = 0.0
+        utilidad_bruta = 0.0
+
+    if len(inversiones_df) > 0:
+        inversiones_df['fecha_dt'] = pd.to_datetime(inversiones_df['fecha']).dt.date
+        mask_i = (inversiones_df['fecha_dt'] >= fecha_inicio) & (inversiones_df['fecha_dt'] <= fecha_fin)
+        inversiones_rango = inversiones_df.loc[mask_i]
+        total_inversiones = inversiones_rango['monto'].sum()
+    else:
+        inversiones_rango = pd.DataFrame()
+        total_inversiones = 0.0
+
+    balance_neto = utilidad_bruta - total_inversiones
+
+    st.markdown("---")
+    st.subheader(f"📈 Balance Financiero del {fecha_inicio} al {fecha_fin}")
+    
+    cb1, cb2, cb3, cb4 = st.columns(4)
+    cb1.metric("Ingresos Totales", f"${total_ingresos:.2f}")
+    cb2.metric("Utilidad por Ventas", f"${utilidad_bruta:.2f}")
+    cb3.metric("Inversiones / Gastos en Rango", f"${total_inversiones:.2f}")
+    
+    delta_color = "normal" if balance_neto >= 0 else "inverse"
+    cb4.metric("Balance Neto Final", f"${balance_neto:.2f}", delta=f"{balance_neto:.2f}", delta_color=delta_color)
+
+    if balance_neto >= 0:
+        st.success(f"🌟 **Balance POSITIVO**: El negocio generó una ganancia neta positiva de **${balance_neto:.2f}** en este periodo.")
+    else:
+        st.error(f"⚠️ **Balance NEGATIVO**: Las inversiones o gastos superaron a la utilidad del periodo por **${abs(balance_neto):.2f}**.")
+
+    st.markdown("---")
+    st.subheader("📊 Gráfica de Comportamiento Diario de Ventas")
+    if len(ventas_rango) > 0:
+        df_diario = ventas_rango.groupby('fecha_dt')['total_venta'].sum().reset_index()
+        df_diario.columns = ['Fecha', 'Ventas ($)']
+        st.bar_chart(df_diario.set_index('Fecha'))
+    else:
+        st.info("No hay registros de ventas en el rango de fechas seleccionado para mostrar gráfica.")
 
 # ----------------------------------------------------
 # 8. CONFIGURACIÓN Y PERSONALIZACIÓN
@@ -649,22 +709,82 @@ elif menu == "⚙️ Configuración y Personalización":
     conn.close()
 
 # ----------------------------------------------------
-# 9. GESTIÓN DE USUARIOS
+# 9. GESTIÓN DE USUARIOS Y PERMISOS
 # ----------------------------------------------------
-elif menu == "👥 Gestión de Usuarios":
+elif menu == "👥 Gestión de Usuarios y Permisos":
     if st.session_state.user['rol'] != 'Administrador':
         st.error("Acceso restringido al Administrador.")
     else:
-        st.markdown('<p class="main-header">👥 Gestión de Usuarios y Accesos</p>', unsafe_allow_html=True)
+        st.markdown('<p class="main-header">👥 Gestión de Usuarios, Roles y Permisos de Acceso</p>', unsafe_allow_html=True)
         conn = get_connection()
-        st.dataframe(pd.read_sql("SELECT id, username, rol, nombre FROM usuarios", conn), use_container_width=True)
+        
+        st.subheader("🛡️ Configuración de Permisos por Rol")
+        roles_permisos = conn.execute("SELECT * FROM permisos_rol").fetchall()
+
+        for rp in roles_permisos:
+            with st.expander(f"🛡️ Rol: {rp['rol']}##rol_{rp['rol']}"):
+                with st.form(f"form_permiso_{rp['rol']}"):
+                    p_vende = st.checkbox("Puede Vender (POS)", value=bool(rp['puede_vender']), key=f"pv_{rp['rol']}")
+                    p_inv = st.checkbox("Puede Editar Inventario, Productos y Combos", value=bool(rp['puede_editar_inventario']), key=f"pi_{rp['rol']}")
+                    p_fin = st.checkbox("Puede Ver Finanzas, Ventas y Reportes", value=bool(rp['puede_ver_finanzas']), key=f"pf_{rp['rol']}")
+                    p_usr = st.checkbox("Puede Gestionar Usuarios y Permisos", value=bool(rp['puede_gestionar_usuarios']), key=f"pu_{rp['rol']}")
+
+                    if st.form_submit_button(f"💾 Guardar Permisos de {rp['rol']}"):
+                        cur = conn.cursor()
+                        cur.execute("""
+                        UPDATE permisos_rol SET puede_vender = ?, puede_editar_inventario = ?, puede_ver_finanzas = ?, puede_gestionar_usuarios = ? WHERE rol = ?
+                        """, (int(p_vende), int(p_inv), int(p_fin), int(p_usr), rp['rol']))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"¡Permisos de {rp['rol']} actualizados!")
+                        st.rerun()
+
+        st.markdown("---")
+        st.subheader("👥 Lista de Usuarios Existentes")
+        usuarios_list = conn.execute("SELECT id, username, rol, nombre FROM usuarios").fetchall()
+
+        for usr in usuarios_list:
+            with st.expander(f"👤 {usr['nombre']} ({usr['username']}) - Rol: {usr['rol']}##usr_{usr['id']}"):
+                with st.form(f"form_edit_usr_{usr['id']}"):
+                    e_nombre = st.text_input("Nombre Completo", value=usr['nombre'], key=f"un_{usr['id']}")
+                    e_user = st.text_input("Usuario (Login)", value=usr['username'], key=f"uu_{usr['id']}")
+                    e_rol = st.selectbox("Rol", ["Administrador", "Socio", "Operador"], index=["Administrador", "Socio", "Operador"].index(usr['rol']), key=f"ur_{usr['id']}")
+                    e_pass = st.text_input("Nueva Contraseña (dejar en blanco para no cambiar)", type="password", key=f"up_{usr['id']}")
+
+                    col_u1, col_u2 = st.columns(2)
+                    with col_u1:
+                        b_u_save = st.form_submit_button("💾 Actualizar Usuario")
+                    with col_u2:
+                        b_u_del = st.form_submit_button("❌ Eliminar Usuario")
+
+                    if b_u_save:
+                        cur = conn.cursor()
+                        if e_pass:
+                            cur.execute("UPDATE usuarios SET nombre = ?, username = ?, rol = ?, password = ? WHERE id = ?", (e_nombre, e_user, e_rol, e_pass, usr['id']))
+                        else:
+                            cur.execute("UPDATE usuarios SET nombre = ?, username = ?, rol = ? WHERE id = ?", (e_nombre, e_user, e_rol, usr['id']))
+                        conn.commit()
+                        conn.close()
+                        st.success("¡Usuario actualizado con éxito!")
+                        st.rerun()
+
+                    if b_u_del:
+                        if usr['username'] == 'admin':
+                            st.error("No se puede eliminar al Administrador principal.")
+                        else:
+                            cur = conn.cursor()
+                            cur.execute("DELETE FROM usuarios WHERE id = ?", (usr['id'],))
+                            conn.commit()
+                            conn.close()
+                            st.warning("Usuario eliminado.")
+                            st.rerun()
 
         st.markdown("---")
         st.subheader("➕ Crear Usuario Nuevo")
         with st.form("new_user_form"):
-            nu_u = st.text_input("Usuario")
+            nu_u = st.text_input("Usuario (login)")
             nu_p = st.text_input("Contraseña", type="password")
-            nu_r = st.selectbox("Rol", ["Socio", "Operador"])
+            nu_r = st.selectbox("Rol Asignado", ["Administrador", "Socio", "Operador"])
             nu_n = st.text_input("Nombre Completo")
 
             if st.form_submit_button("Crear Usuario"):
@@ -673,8 +793,8 @@ elif menu == "👥 Gestión de Usuarios":
                     cur.execute("INSERT INTO usuarios (username, password, rol, nombre) VALUES (?, ?, ?, ?)", (nu_u, nu_p, nu_r, nu_n))
                     conn.commit()
                     conn.close()
-                    st.success("¡Usuario creado!")
+                    st.success("¡Usuario creado con éxito!")
                     st.rerun()
                 except:
-                    st.error("Error: El usuario ya existe.")
+                    st.error("Error: El nombre de usuario ya existe.")
         conn.close()
