@@ -67,7 +67,6 @@ def init_tables():
     cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('socio', '1234', 'Socio', 'Socio Ruta Fría')")
     cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, rol, nombre) VALUES ('cajero', '1234', 'Operador', 'Personal de Caja')")
     
-    # Permisos por defecto
     cursor.execute("INSERT OR IGNORE INTO permisos_rol (rol, puede_vender, puede_editar_inventario, puede_ver_finanzas, puede_gestionar_usuarios) VALUES ('Administrador', 1, 1, 1, 1)")
     cursor.execute("INSERT OR IGNORE INTO permisos_rol (rol, puede_vender, puede_editar_inventario, puede_ver_finanzas, puede_gestionar_usuarios) VALUES ('Socio', 1, 1, 1, 0)")
     cursor.execute("INSERT OR IGNORE INTO permisos_rol (rol, puede_vender, puede_editar_inventario, puede_ver_finanzas, puede_gestionar_usuarios) VALUES ('Operador', 1, 0, 0, 0)")
@@ -78,23 +77,59 @@ def init_tables():
 init_tables()
 
 st.set_page_config(
-    page_title="Ruta Fría - Sistema POS y Gestión",
+    page_title="Ruta Fría - Enterprise POS & Management",
     page_icon="🧊",
     layout="wide"
 )
 
+# Estilos CSS Corporativos Avanzados (Estilo Shopify / Square Enterprise)
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.2rem;
-        color: #00A8E8;
-        font-weight: bold;
+    /* Ocultar elementos nativos de Streamlit para apariencia nativa */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    .stApp {
+        background-color: #f4f6f9;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Tarjetas corporativas flotantes */
+    .enterprise-card {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        margin-bottom: 16px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .enterprise-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+    }
+
+    /* Encabezados modernos */
+    .main-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.025em;
         margin-bottom: 0px;
     }
-    .sub-header {
-        font-size: 1.1rem;
-        color: #555555;
-        margin-bottom: 20px;
+    .sub-title {
+        font-size: 1rem;
+        color: #64748b;
+        margin-bottom: 24px;
+    }
+
+    /* Botones corporativos primarios */
+    .stButton>button {
+        border-radius: 8px;
+        font-weight: 600;
+        border: none;
+        transition: all 0.2s ease;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -119,88 +154,98 @@ def verificar_permiso(permiso_key):
     return bool(row[permiso_key]) if row else False
 
 if st.session_state.user is None:
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
         logo_file = get_config('logo_path')
         logo_path = os.path.join(os.path.dirname(__file__), logo_file if logo_file else "logo.png")
         if os.path.exists(logo_path):
-            st.image(logo_path, width=220)
+            st.image(logo_path, width=200)
         else:
             st.image("https://img.icons8.com/color/96/cold-drink.png", width=100)
         
-        st.markdown("<h1 style='text-align: center; color: #00A8E8;'>Ruta Fría POS</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>Inicia sesión para acceder al sistema</p>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #0f172a; font-weight: 800;'>Ruta Fría Enterprise POS</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #64748b; font-size: 0.95rem;'>Plataforma centralizada de operaciones y ventas</p>", unsafe_allow_html=True)
         
-        with st.form("login_form"):
-            username = st.text_input("Usuario")
-            password = st.text_input("Contraseña", type="password")
-            submit_login = st.form_submit_button("🔑 Entrar al Sistema")
-            
-            if submit_login:
-                conn = get_connection()
-                user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
-                conn.close()
-                if user_row:
-                    st.session_state.user = {
-                        "id": user_row['id'],
-                        "username": user_row['username'],
-                        "nombre": user_row['nombre'],
-                        "rol": user_row['rol']
-                    }
-                    st.success(f"¡Bienvenido, {user_row['nombre']}!")
-                    st.rerun()
-                else:
-                    st.error("Usuario o contraseña incorrectos.")
+        with st.container():
+            st.markdown('<div class="enterprise-card">', unsafe_allow_html=True)
+            with st.form("login_form"):
+                username = st.text_input("Usuario Corporativo")
+                password = st.text_input("Contraseña de Acceso", type="password")
+                submit_login = st.form_submit_button("Iniciar Sesión Segura", use_container_width=True)
+                
+                if submit_login:
+                    conn = get_connection()
+                    user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
+                    conn.close()
+                    if user_row:
+                        st.session_state.user = {
+                            "id": user_row['id'],
+                            "username": user_row['username'],
+                            "nombre": user_row['nombre'],
+                            "rol": user_row['rol']
+                        }
+                        st.success(f"Sesión iniciada: {user_row['nombre']}")
+                        st.rerun()
+                    else:
+                        st.error("Credenciales inválidas.")
+            st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# Menú lateral
+# Menú lateral ejecutivo con Iconos vectoriales nativos `:material/...`
 logo_file = get_config('logo_path')
 logo_path = os.path.join(os.path.dirname(__file__), logo_file if logo_file else "logo.png")
 if os.path.exists(logo_path):
-    st.sidebar.image(logo_path, width=160)
-else:
-    st.sidebar.image("https://img.icons8.com/color/96/cold-drink.png", width=80)
+    st.sidebar.image(logo_path, width=140)
 
-st.sidebar.title("Ruta Fría POS")
-st.sidebar.markdown(f"👤 **{st.session_state.user['nombre']}**\n\n🛡️ Rol: *{st.session_state.user['rol']}*")
+st.sidebar.markdown(f"**{st.session_state.user['nombre']}**\n\n`Rol: {st.session_state.user['rol']}`")
 st.sidebar.markdown("---")
 
-menu_options = []
+menu_options = {}
 if verificar_permiso('puede_vender'):
-    menu_options.append("🛒 Punto de Venta (POS)")
+    menu_options["Punto de Venta"] = ":material/point_of_sale:"
 if verificar_permiso('puede_editar_inventario'):
-    menu_options.extend([
-        "📦 Inventario y Costos de Insumos", 
-        "🍔 Productos y Recetas (Escandallo)", 
-        "🎁 Combos y Paquetes"
-    ])
+    menu_options.update({
+        "Inventario": ":material/inventory_2:",
+        "Productos y Recetas": ":material/receipt_long:",
+        "Combos y Paquetes": ":material/local_offer:"
+    })
 
-menu_options.append("👥 Clientes y Domicilios")
+menu_options["Clientes y Domicilios"] = ":material/groups:"
 
 if verificar_permiso('puede_ver_finanzas'):
-    menu_options.extend([
-        "💰 Ventas y Finanzas", 
-        "📊 Reportes, Utilidad y Balances"
-    ])
+    menu_options.update({
+        "Ventas y Tickets": ":material/payments:",
+        "Reportes y Balances": ":material/analytics:"
+    })
 
-menu_options.append("⚙️ Configuración y Personalización")
+menu_options["Configuración"] = ":material/settings:"
 
 if verificar_permiso('puede_gestionar_usuarios'):
-    menu_options.append("👥 Gestión de Usuarios y Permisos")
+    menu_options["Gestión de Usuarios"] = ":material/admin_panel_settings:"
 
-menu = st.sidebar.radio("Navegación", menu_options)
+# Radio de navegación con iconos vectoriales limpios
+selected_label = st.sidebar.radio(
+    "Navegación Principal",
+    options=list(menu_options.keys()),
+    format_func=lambda x: f"{menu_options[x]}  {x}"
+)
 
-if st.sidebar.button("🚪 Cerrar Sesión"):
+st.sidebar.markdown("---")
+if st.sidebar.button("Cerrar Sesión", use_container_width=True):
     st.session_state.user = None
     st.session_state.carrito = []
     st.rerun()
 
+# Mapeo de selección
+menu = selected_label
+
 # ----------------------------------------------------
 # 1. PUNTO DE VENTA (POS)
 # ----------------------------------------------------
-if menu == "🛒 Punto de Venta (POS)":
-    st.markdown('<p class="main-header">🧊 Punto de Venta - Ruta Fría</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Caja rápida con selección de cliente, dirección de entrega y personalización de extras</p>', unsafe_allow_html=True)
+if menu == "Punto de Venta":
+    st.markdown('<p class="main-title">Punto de Venta (POS)</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Terminal comercial para mostrador y entregas a domicilio en moto</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     clientes_rows = conn.execute("SELECT * FROM clientes").fetchall()
@@ -208,9 +253,10 @@ if menu == "🛒 Punto de Venta (POS)":
     
     col_c1, col_c2 = st.columns([2, 1])
     with col_c1:
-        sel_cliente_str = st.selectbox("📍 Seleccionar Cliente (Muestra Dirección)", cliente_opciones)
+        sel_cliente_str = st.selectbox("Seleccionar Cliente Corporativo", cliente_opciones)
     with col_c2:
-        if st.button("➕ Nuevo Cliente"):
+        st.markdown("<div style='height: 27px;'></div>", unsafe_allow_html=True)
+        if st.button("Nuevo Cliente", use_container_width=True):
             st.session_state.show_quick_client = True
 
     cliente_seleccionado_obj = None
@@ -220,24 +266,24 @@ if menu == "🛒 Punto de Venta (POS)":
                 cliente_seleccionado_obj = c
                 break
         if cliente_seleccionado_obj:
-            st.info(f"🛵 **Dirección de Entrega:** {cliente_seleccionado_obj['direccion'] or 'No especificada'} | 📱 **Teléfono:** {cliente_seleccionado_obj['telefono'] or 'N/A'}")
+            st.info(f"**Dirección de Envío:** {cliente_seleccionado_obj['direccion'] or 'No especificada'} | **Contacto:** {cliente_seleccionado_obj['telefono'] or 'N/A'}")
 
     if st.session_state.get('show_quick_client', False):
         with st.form("quick_client_form"):
-            st.subheader("Registro Rápido de Cliente")
-            qc_nombre = st.text_input("Nombre")
+            st.markdown("##### Registro Rápido de Cliente")
+            qc_nombre = st.text_input("Nombre Completo")
             qc_tel = st.text_input("Teléfono / WhatsApp")
             qc_dir = st.text_area("Dirección para Repartidor")
-            if st.form_submit_button("Guardar y Seleccionar"):
+            if st.form_submit_button("Guardar Cliente"):
                 if qc_nombre:
                     cur = conn.cursor()
                     cur.execute("INSERT INTO clientes (nombre, telefono, direccion) VALUES (?, ?, ?)", (qc_nombre, qc_tel, qc_dir))
                     conn.commit()
-                    st.success("¡Cliente registrado!")
+                    st.success("¡Cliente guardado!")
                     st.session_state.show_quick_client = False
                     st.rerun()
 
-    tab_prod, tab_combo = st.tabs(["🥤 Productos Individuales", "🎁 Paquetes y Combos"])
+    tab_prod, tab_combo = st.tabs(["Productos Individuales", "Paquetes y Combos"])
 
     if "carrito" not in st.session_state:
         st.session_state.carrito = []
@@ -248,24 +294,26 @@ if menu == "🛒 Punto de Venta (POS)":
         for idx, prod in enumerate(productos):
             with cols[idx % 3]:
                 st.markdown(f"""
-                <div style="border: 1px solid #ddd; padding: 15px; border-radius: 10px; margin-bottom: 15px; background: white;">
-                    <h4 style="color: #0077B6; margin-bottom: 5px;">{prod['nombre']}</h4>
-                    <p style="color: #666; font-size: 0.9rem; min-height: 40px;">{prod['descripcion']}</p>
-                    <h3 style="color: #2b9348;">${prod['precio_venta']:.2f}</h3>
-                    <p style="font-size: 0.8rem; color: #888;">Costo est: ${prod['costo_calculado']:.2f}</p>
+                <div class="enterprise-card" style="min-height: 160px;">
+                    <h4 style="color: #0284c7; margin-top: 0; margin-bottom: 8px;">{prod['nombre']}</h4>
+                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{prod['descripcion']}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+                        <span style="font-size: 1.25rem; font-weight: 700; color: #16a34a;">${prod['precio_venta']:.2f}</span>
+                        <span style="font-size: 0.75rem; color: #94a3b8;">Costo: ${prod['costo_calculado']:.2f}</span>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                with st.expander(f"➕ Agregar / Personalizar##{prod['id']}"):
+                with st.expander(f"Personalizar / Añadir##{prod['id']}"):
                     with st.form(f"form_add_{prod['id']}"):
                         cant_prod = st.number_input("Cantidad", min_value=1, value=1, key=f"cp_{prod['id']}")
                         insumos_disp = conn.execute("SELECT * FROM insumos").fetchall()
                         ins_nombres = [i['nombre'] for i in insumos_disp]
-                        extra_elegido = st.selectbox("Agregar ingrediente extra", ["Ninguno"] + ins_nombres, key=f"ext_{prod['id']}")
+                        extra_elegido = st.selectbox("Ingrediente Extra", ["Ninguno"] + ins_nombres, key=f"ext_{prod['id']}")
                         cantidad_extra = st.number_input("Cantidad extra", min_value=0.0, value=0.0, key=f"cext_{prod['id']}")
                         nota_personalizada = st.text_input("Nota especial", key=f"np_{prod['id']}")
 
-                        if st.form_submit_button("Añadir al Carrito"):
+                        if st.form_submit_button("Agregar al Carrito", use_container_width=True):
                             precio_final = prod['precio_venta']
                             costo_final = prod['costo_calculado']
                             nombre_item = prod['nombre']
@@ -288,7 +336,7 @@ if menu == "🛒 Punto de Venta (POS)":
                                 "costo": costo_final,
                                 "cantidad": int(cant_prod)
                             })
-                            st.success(f"¡Agregado!")
+                            st.success("Añadido al ticket.")
                             st.rerun()
 
     with tab_combo:
@@ -297,19 +345,19 @@ if menu == "🛒 Punto de Venta (POS)":
         for idx, combo in enumerate(combos):
             with cols_c[idx % 2]:
                 st.markdown(f"""
-                <div style="border: 2px dashed #00A8E8; padding: 15px; border-radius: 10px; margin-bottom: 15px; background: #fdfefe;">
-                    <h4 style="color: #d90429; margin-bottom: 5px;">{combo['nombre']}</h4>
-                    <p style="color: #444; font-size: 0.9rem; min-height: 40px;">{combo['descripcion']}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="enterprise-card" style="border-left: 4px solid #0284c7;">
+                    <h4 style="color: #0f172a; margin-top: 0; margin-bottom: 6px;">{combo['nombre']}</h4>
+                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{combo['descripcion']}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
                         <div>
-                            <span style="text-decoration: line-through; color: #999; font-size: 1rem;">${combo['precio_regular']:.2f}</span>
-                            <h2 style="color: #2b9348; margin: 0;">${combo['precio_combo']:.2f}</h2>
+                            <span style="text-decoration: line-through; color: #94a3b8; font-size: 0.9rem;">${combo['precio_regular']:.2f}</span>
+                            <span style="font-size: 1.25rem; font-weight: 700; color: #16a34a; margin-left: 8px;">${combo['precio_combo']:.2f}</span>
                         </div>
-                        <span style="background: #ffb703; color: #fff; padding: 5px 10px; border-radius: 5px; font-weight: bold;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-                if st.button(f"Agregar Combo##{combo['id']}", key=f"btn_c_{combo['id']}"):
+                if st.button(f"Añadir Paquete##{combo['id']}", key=f"btn_c_{combo['id']}", use_container_width=True):
                     st.session_state.carrito.append({
                         "tipo": "combo",
                         "id": combo['id'],
@@ -318,10 +366,11 @@ if menu == "🛒 Punto de Venta (POS)":
                         "costo": combo['costo_total'],
                         "cantidad": 1
                     })
-                    st.success(f"¡Combo agregado!")
+                    st.success("Paquete añadido.")
+                    st.rerun()
 
     st.markdown("---")
-    st.subheader("🛒 Resumen de Ticket Actual")
+    st.markdown("### Resumen del Ticket Activo")
 
     if len(st.session_state.carrito) > 0:
         for i, item in enumerate(st.session_state.carrito):
@@ -342,7 +391,7 @@ if menu == "🛒 Punto de Venta (POS)":
             subtotal = item['precio'] * item['cantidad']
             c4.write(f"**${subtotal:.2f}**")
             
-            if c5.button("❌##del_cart_" + str(i), key=f"del_{i}"):
+            if c5.button("Quitar##del_cart_" + str(i), key=f"del_{i}"):
                 st.session_state.carrito.pop(i)
                 st.rerun()
 
@@ -350,19 +399,27 @@ if menu == "🛒 Punto de Venta (POS)":
         costo_general = sum(item['costo'] * item['cantidad'] for item in st.session_state.carrito)
         utilidad_estimada = total_general - costo_general
 
-        st.markdown(f"### Total a Pagar: <span style='color: #2b9348;'>${total_general:.2f}</span>", unsafe_allow_html=True)
-        st.markdown(f"Utilidad neta estimada: **${utilidad_estimada:.2f}**")
+        st.markdown(f"""
+        <div class="enterprise-card" style="background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Utilidad Neta Estimada: <strong style="color: #16a34a;">${utilidad_estimada:.2f}</strong></p>
+            </div>
+            <div>
+                <h2 style="margin: 0; color: #0f172a;">Total a Cobrar: <span style="color: #16a34a;">${total_general:.2f}</span></h2>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         metodo_pago = st.selectbox("Método de Pago", ["Efectivo", "Transferencia / QR", "Tarjeta"])
-        notas_venta = st.text_input("Notas adicionales del ticket")
+        notas_venta = st.text_input("Observaciones o notas del ticket")
 
         col_b1, col_b2 = st.columns(2)
         with col_b1:
-            if st.button("🚨 Limpiar Carrito", type="secondary"):
+            if st.button("Vaciar Carrito", use_container_width=True):
                 st.session_state.carrito = []
                 st.rerun()
         with col_b2:
-            if st.button("✅ Cobrar y Registrar Venta", type="primary"):
+            if st.button("Procesar y Cobrar Venta", type="primary", use_container_width=True):
                 folio = f"RF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
                 fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 cliente_final = sel_cliente_str if sel_cliente_str != "Venta General / Mostrador" else "Mostrador"
@@ -399,38 +456,40 @@ if menu == "🛒 Punto de Venta (POS)":
                 conn.commit()
                 conn.close()
 
-                st.success(f"🎉 ¡Venta cobrada con éxito! Folio: {folio}")
+                st.success(f"¡Venta procesada con éxito! Folio: {folio}")
                 st.session_state.carrito = []
                 st.balloons()
     else:
-        st.info("El carrito está vacío. Agrega productos o combos para comenzar.")
+        st.info("El ticket actual se encuentra vacío.")
 
     conn.close()
 
 # ----------------------------------------------------
-# 2. INVENTARIO Y COSTOS DE INSUMOS
+# 2. INVENTARIO
 # ----------------------------------------------------
-elif menu == "📦 Inventario y Costos de Insumos":
-    st.markdown('<p class="main-header">📦 Gestión de Insumos, Costos y Materia Prima</p>', unsafe_allow_html=True)
+elif menu == "Inventario":
+    st.markdown('<p class="main-title">Control de Inventario y Costos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Gestión de insumos, materias primas y control de stock mínimo</p>', unsafe_allow_html=True)
+
     conn = get_connection()
     insumos_list = conn.execute("SELECT * FROM insumos").fetchall()
 
     for idx, ins in enumerate(insumos_list):
-        with st.expander(f"📌 {ins['nombre']} | Costo: ${ins['costo_unidad']:.4f}##{ins['id']}"):
+        with st.expander(f"{ins['nombre']} — Stock: {ins['stock_actual']} {ins['unidad']}##{ins['id']}"):
             with st.form(f"form_edit_insumo_{ins['id']}"):
                 nuevo_nombre = st.text_input("Nombre", value=ins['nombre'], key=f"ni_{ins['id']}")
                 nueva_cat = st.text_input("Categoría", value=ins['categoria'], key=f"ci_{ins['id']}")
-                nueva_unidad = st.text_input("Unidad base", value=ins['unidad'], key=f"ui_{ins['id']}")
-                nuevo_costo = st.number_input("Costo por Unidad Base ($)", value=float(ins['costo_unidad']), format="%.4f", key=f"co_{ins['id']}")
+                nueva_unidad = st.text_input("Unidad", value=ins['unidad'], key=f"ui_{ins['id']}")
+                nuevo_costo = st.number_input("Costo Unitario ($)", value=float(ins['costo_unidad']), format="%.4f", key=f"co_{ins['id']}")
                 nuevo_stock = st.number_input("Stock Actual", value=float(ins['stock_actual']), key=f"st_{ins['id']}")
                 nuevo_min = st.number_input("Stock Mínimo", value=float(ins['stock_minimo']), key=f"mi_{ins['id']}")
                 nuevo_prov = st.text_input("Proveedor", value=str(ins['proveedor'] or ''), key=f"pr_{ins['id']}")
 
                 col_i1, col_i2 = st.columns(2)
                 with col_i1:
-                    b_ins_save = st.form_submit_button("💾 Guardar Insumo")
+                    b_ins_save = st.form_submit_button("Guardar Cambios", use_container_width=True)
                 with col_i2:
-                    b_ins_del = st.form_submit_button("❌ Eliminar Insumo")
+                    b_ins_del = st.form_submit_button("Eliminar Insumo", use_container_width=True)
 
                 if b_ins_save:
                     cur = conn.cursor()
@@ -440,31 +499,33 @@ elif menu == "📦 Inventario y Costos de Insumos":
                     """, (nuevo_nombre, nueva_cat, nueva_unidad, nuevo_costo, nuevo_stock, nuevo_min, nuevo_prov, datetime.now().strftime("%Y-%m-%d %H:%M"), ins['id']))
                     conn.commit()
                     conn.close()
-                    st.success("¡Actualizado!")
+                    st.success("Insumo actualizado.")
                     st.rerun()
 
                 if b_ins_del:
                     if st.session_state.user['rol'] == 'Operador':
-                        st.error("Sin permisos.")
+                        st.error("Permisos insuficientes.")
                     else:
                         cur = conn.cursor()
                         cur.execute("DELETE FROM insumos WHERE id = ?", (ins['id'],))
                         conn.commit()
                         conn.close()
-                        st.warning("Eliminado.")
+                        st.warning("Insumo eliminado.")
                         st.rerun()
     conn.close()
 
 # ----------------------------------------------------
-# 3. PRODUCTOS Y RECETAS (ESCANDALLO)
+# 3. PRODUCTOS Y RECETAS
 # ----------------------------------------------------
-elif menu == "🍔 Productos y Recetas (Escandallo)":
-    st.markdown('<p class="main-header">🍔 Catálogo de Productos y Recetas</p>', unsafe_allow_html=True)
+elif menu == "Productos y Recetas":
+    st.markdown('<p class="main-title">Catálogo de Productos y Recetas (Escandallo)</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Estructura de costos por porción y márgenes de utilidad</p>', unsafe_allow_html=True)
+
     conn = get_connection()
     productos_list = conn.execute("SELECT * FROM productos").fetchall()
 
     for idx, prod in enumerate(productos_list):
-        with st.expander(f"🥤 {prod['nombre']} | Venta: ${prod['precio_venta']:.2f}##{prod['id']}"):
+        with st.expander(f"{prod['nombre']} — Venta: ${prod['precio_venta']:.2f}##{prod['id']}"):
             with st.form(f"form_prod_{prod['id']}"):
                 p_nom = st.text_input("Nombre", value=prod['nombre'], key=f"pn_{prod['id']}")
                 p_cat = st.text_input("Categoría", value=prod['categoria'], key=f"pc_{prod['id']}")
@@ -473,16 +534,16 @@ elif menu == "🍔 Productos y Recetas (Escandallo)":
                 
                 col_p1, col_p2 = st.columns(2)
                 with col_p1:
-                    b_p_save = st.form_submit_button("💾 Guardar")
+                    b_p_save = st.form_submit_button("Guardar", use_container_width=True)
                 with col_p2:
-                    b_p_del = st.form_submit_button("❌ Eliminar Producto")
+                    b_p_del = st.form_submit_button("Eliminar", use_container_width=True)
 
                 if b_p_save:
                     cur = conn.cursor()
                     cur.execute("UPDATE productos SET nombre = ?, categoria = ?, precio_venta = ?, descripcion = ? WHERE id = ?", (p_nom, p_cat, p_precio, p_desc, prod['id']))
                     conn.commit()
                     conn.close()
-                    st.success("Actualizado")
+                    st.success("Actualizado.")
                     st.rerun()
 
                 if b_p_del:
@@ -490,20 +551,22 @@ elif menu == "🍔 Productos y Recetas (Escandallo)":
                     cur.execute("DELETE FROM productos WHERE id = ?", (prod['id'],))
                     conn.commit()
                     conn.close()
-                    st.warning("Eliminado")
+                    st.warning("Eliminado.")
                     st.rerun()
     conn.close()
 
 # ----------------------------------------------------
 # 4. COMBOS Y PAQUETES
 # ----------------------------------------------------
-elif menu == "🎁 Combos y Paquetes":
-    st.markdown('<p class="main-header">🎁 Combos y Paquetes Estratégicos</p>', unsafe_allow_html=True)
+elif menu == "Combos y Paquetes":
+    st.markdown('<p class="main-title">Paquetes y Combos Promocionales</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Creación y configuración de estrategias comerciales por volumen</p>', unsafe_allow_html=True)
+
     conn = get_connection()
     combos = conn.execute("SELECT * FROM combos").fetchall()
 
     for idx, combo in enumerate(combos):
-        with st.expander(f"📦 {combo['nombre']} | Precio: ${combo['precio_combo']:.2f} (Ahorro {combo['descuento_porcentaje']:.1f}%)##combo_{combo['id']}"):
+        with st.expander(f"{combo['nombre']} — Precio: ${combo['precio_combo']:.2f}##combo_{combo['id']}"):
             with st.form(f"combo_edit_{combo['id']}"):
                 c_nom = st.text_input("Nombre del Combo", value=combo['nombre'], key=f"cn_{combo['id']}")
                 c_desc = st.text_input("Descripción", value=combo['descripcion'], key=f"cd_{combo['id']}")
@@ -512,9 +575,9 @@ elif menu == "🎁 Combos y Paquetes":
 
                 col_cb1, col_cb2 = st.columns(2)
                 with col_cb1:
-                    b_cs = st.form_submit_button("💾 Actualizar Combo")
+                    b_cs = st.form_submit_button("Actualizar", use_container_width=True)
                 with col_cb2:
-                    b_cd = st.form_submit_button("❌ Eliminar Combo")
+                    b_cd = st.form_submit_button("Eliminar", use_container_width=True)
 
                 if b_cs:
                     desc_p = ((c_reg - c_com) / c_reg) * 100 if c_reg > 0 else 0
@@ -523,12 +586,13 @@ elif menu == "🎁 Combos y Paquetes":
                                 (c_nom, c_desc, c_reg, c_com, desc_p, combo['id']))
                     conn.commit()
                     conn.close()
-                    st.success("¡Combo actualizado!")
+                    st.success("Combo actualizado.")
                     st.rerun()
 
                 if b_cd:
                     cur = conn.cursor()
                     cur.execute("DELETE FROM combos WHERE id = ?", (combo['id'],))
+                    cur.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo['id'],))
                     conn.commit()
                     conn.close()
                     st.warning("Combo eliminado.")
@@ -538,13 +602,15 @@ elif menu == "🎁 Combos y Paquetes":
 # ----------------------------------------------------
 # 5. CLIENTES Y DOMICILIOS
 # ----------------------------------------------------
-elif menu == "👥 Clientes y Domicilios":
-    st.markdown('<p class="main-header">👥 Directorio de Clientes y Servicio a Domicilio</p>', unsafe_allow_html=True)
+elif menu == "Clientes y Domicilios":
+    st.markdown('<p class="main-title">Directorio de Clientes y Domicilios</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Gestión de contactos para logística de entregas en moto</p>', unsafe_allow_html=True)
+
     conn = get_connection()
     clientes = conn.execute("SELECT * FROM clientes").fetchall()
 
     for idx, cli in enumerate(clientes):
-        with st.expander(f"👤 {cli['nombre']} | Tel: {cli['telefono'] or 'N/A'}##cli_{cli['id']}"):
+        with st.expander(f"{cli['nombre']} — Tel: {cli['telefono'] or 'N/A'}##cli_{cli['id']}"):
             with st.form(f"form_cli_{cli['id']}"):
                 cl_nom = st.text_input("Nombre", value=cli['nombre'], key=f"clin_{cli['id']}")
                 cl_tel = st.text_input("Teléfono", value=str(cli['telefono'] or ''), key=f"clt_{cli['id']}")
@@ -553,16 +619,16 @@ elif menu == "👥 Clientes y Domicilios":
 
                 col_cl1, col_cl2 = st.columns(2)
                 with col_cl1:
-                    b_cl_save = st.form_submit_button("💾 Guardar Cliente")
+                    b_cl_save = st.form_submit_button("Guardar", use_container_width=True)
                 with col_cl2:
-                    b_cl_del = st.form_submit_button("❌ Eliminar Cliente")
+                    b_cl_del = st.form_submit_button("Eliminar", use_container_width=True)
 
                 if b_cl_save:
                     cur = conn.cursor()
                     cur.execute("UPDATE clientes SET nombre = ?, telefono = ?, direccion = ?, notas = ? WHERE id = ?", (cl_nom, cl_tel, cl_dir, cl_not, cli['id']))
                     conn.commit()
                     conn.close()
-                    st.success("¡Cliente actualizado!")
+                    st.success("Cliente actualizado.")
                     st.rerun()
 
                 if b_cl_del:
@@ -577,21 +643,23 @@ elif menu == "👥 Clientes y Domicilios":
 # ----------------------------------------------------
 # 6. VENTAS Y FINANZAS
 # ----------------------------------------------------
-elif menu == "💰 Ventas y Finanzas":
-    st.markdown('<p class="main-header">💰 Reporte de Ventas y Finanzas</p>', unsafe_allow_html=True)
+elif menu == "Ventas y Tickets":
+    st.markdown('<p class="main-title">Historial de Ventas y Tickets</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Registro de operaciones comerciales y auditoría</p>', unsafe_allow_html=True)
+
     conn = get_connection()
     ventas_df = pd.read_sql("SELECT * FROM ventas ORDER BY fecha_hora DESC", conn)
 
     if len(ventas_df) > 0:
-        periodo = st.radio("Periodo", ["Diario (Hoy)", "Semanal (Últimos 7 días)", "Mensual (Último mes)", "Histórico Completo"])
+        periodo = st.radio("Periodo de consulta", ["Diario (Hoy)", "Semanal (7 días)", "Mensual (30 días)", "Histórico"])
         ventas_df['fecha_dt'] = pd.to_datetime(ventas_df['fecha_hora'])
         hoy = datetime.now()
 
         if periodo == "Diario (Hoy)":
             ventas_filt = ventas_df[ventas_df['fecha_dt'].dt.date == hoy.date()]
-        elif periodo == "Semanal (Últimos 7 días)":
+        elif periodo == "Semanal (7 días)":
             ventas_filt = ventas_df[ventas_df['fecha_dt'] >= hoy - timedelta(days=7)]
-        elif periodo == "Mensual (Último mes)":
+        elif periodo == "Mensual (30 días)":
             ventas_filt = ventas_df[ventas_df['fecha_dt'] >= hoy - timedelta(days=30)]
         else:
             ventas_filt = ventas_df
@@ -610,40 +678,36 @@ elif menu == "💰 Ventas y Finanzas":
         st.markdown("---")
         st.dataframe(ventas_filt[['folio', 'fecha_hora', 'total_venta', 'costo_total', 'utilidad_neta', 'metodo_pago', 'notas']], use_container_width=True)
     else:
-        st.info("Sin ventas registradas.")
+        st.info("No hay ventas registradas.")
     conn.close()
 
 # ----------------------------------------------------
-# 7. REPORTES, UTILIDAD Y BALANCES (CON CALENDARIO Y RANGO PERSONALIZADO)
+# 7. REPORTES Y BALANCES
 # ----------------------------------------------------
-elif menu == "📊 Reportes, Utilidad y Balances":
-    st.markdown('<p class="main-header">📊 Análisis Financiero, Balances y Reportes por Rango de Fechas</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Selecciona un calendario con rango personalizado de fechas para calcular ingresos, utilidad y balance neto</p>', unsafe_allow_html=True)
+elif menu == "Reportes y Balances":
+    st.markdown('<p class="main-title">Reportes y Balances Financieros</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Análisis corporativo por rango de fechas personalizado</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     ventas_df = pd.read_sql("SELECT * FROM ventas", conn)
     inversiones_df = pd.read_sql("SELECT * FROM inversiones", conn)
     conn.close()
 
-    # Selector de Rango de Fechas con Calendario
     col_d1, col_d2 = st.columns(2)
     with col_d1:
-        fecha_inicio = st.date_input("📅 Fecha de Inicio", value=datetime.now().date() - timedelta(days=30))
+        fecha_inicio = st.date_input("Fecha Inicial", value=datetime.now().date() - timedelta(days=30))
     with col_d2:
-        fecha_fin = st.date_input("📅 Fecha de Fin", value=datetime.now().date())
+        fecha_fin = st.date_input("Fecha Final", value=datetime.now().date())
 
     if len(ventas_df) > 0:
         ventas_df['fecha_dt'] = pd.to_datetime(ventas_df['fecha_hora']).dt.date
         mask_v = (ventas_df['fecha_dt'] >= fecha_inicio) & (ventas_df['fecha_dt'] <= fecha_fin)
         ventas_rango = ventas_df.loc[mask_v]
-
         total_ingresos = ventas_rango['total_venta'].sum()
-        total_costo_ventas = ventas_rango['costo_total'].sum()
         utilidad_bruta = ventas_rango['utilidad_neta'].sum()
     else:
         ventas_rango = pd.DataFrame()
         total_ingresos = 0.0
-        total_costo_ventas = 0.0
         utilidad_bruta = 0.0
 
     if len(inversiones_df) > 0:
@@ -652,110 +716,98 @@ elif menu == "📊 Reportes, Utilidad y Balances":
         inversiones_rango = inversiones_df.loc[mask_i]
         total_inversiones = inversiones_rango['monto'].sum()
     else:
-        inversiones_rango = pd.DataFrame()
         total_inversiones = 0.0
 
     balance_neto = utilidad_bruta - total_inversiones
 
     st.markdown("---")
-    st.subheader(f"📈 Balance Financiero del {fecha_inicio} al {fecha_fin}")
-    
     cb1, cb2, cb3, cb4 = st.columns(4)
     cb1.metric("Ingresos Totales", f"${total_ingresos:.2f}")
-    cb2.metric("Utilidad por Ventas", f"${utilidad_bruta:.2f}")
-    cb3.metric("Inversiones / Gastos en Rango", f"${total_inversiones:.2f}")
-    
-    delta_color = "normal" if balance_neto >= 0 else "inverse"
-    cb4.metric("Balance Neto Final", f"${balance_neto:.2f}", delta=f"{balance_neto:.2f}", delta_color=delta_color)
+    cb2.metric("Utilidad Comercial", f"${utilidad_bruta:.2f}")
+    cb3.metric("Gastos / Inversiones", f"${total_inversiones:.2f}")
+    cb4.metric("Balance Neto", f"${balance_neto:.2f}", delta=f"{balance_neto:.2f}")
 
     if balance_neto >= 0:
-        st.success(f"🌟 **Balance POSITIVO**: El negocio generó una ganancia neta positiva de **${balance_neto:.2f}** en este periodo.")
+        st.success(f"Balance Positivo: Utilidad neta de ${balance_neto:.2f} en el periodo.")
     else:
-        st.error(f"⚠️ **Balance NEGATIVO**: Las inversiones o gastos superaron a la utilidad del periodo por **${abs(balance_neto):.2f}**.")
+        st.error(f"Balance Negativo: Déficit de ${abs(balance_neto):.2f} en el periodo.")
 
     st.markdown("---")
-    st.subheader("📊 Gráfica de Comportamiento Diario de Ventas")
     if len(ventas_rango) > 0:
         df_diario = ventas_rango.groupby('fecha_dt')['total_venta'].sum().reset_index()
         df_diario.columns = ['Fecha', 'Ventas ($)']
         st.bar_chart(df_diario.set_index('Fecha'))
     else:
-        st.info("No hay registros de ventas en el rango de fechas seleccionado para mostrar gráfica.")
+        st.info("Sin datos para graficar en el rango seleccionado.")
 
 # ----------------------------------------------------
-# 8. CONFIGURACIÓN Y PERSONALIZACIÓN
+# 8. CONFIGURACIÓN
 # ----------------------------------------------------
-elif menu == "⚙️ Configuración y Personalización":
-    st.markdown('<p class="main-header">⚙️ Configuración del Sistema y Logotipo</p>', unsafe_allow_html=True)
+elif menu == "Configuración":
+    st.markdown('<p class="main-title">Configuración Corporativa</p>', unsafe_allow_html=True)
     conn = get_connection()
     current_logo = get_config('logo_path')
     
-    st.info(f"Logotipo actual: **{current_logo}**")
-    logo_path = os.path.join(os.path.dirname(__file__), current_logo if current_logo else "logo.png")
-    if os.path.exists(logo_path):
-        st.image(logo_path, width=220)
-
-    st.markdown("---")
-    st.subheader("🖼️ Cambiar Logotipo Corporativo")
+    st.info(f"Logotipo actual: {current_logo}")
     with st.form("config_logo_form"):
-        nuevo_nombre_logo = st.text_input("Nombre de archivo de imagen (ej. logo.png)", value=current_logo)
-        if st.form_submit_button("Actualizar Logo"):
+        nuevo_nombre_logo = st.text_input("Archivo de Logotipo (en carpeta ruta_fria_pos)", value=current_logo)
+        if st.form_submit_button("Actualizar Logotipo"):
             cur = conn.cursor()
             cur.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('logo_path', ?)", (nuevo_nombre_logo,))
             conn.commit()
             conn.close()
-            st.success("¡Logo actualizado con éxito!")
+            st.success("Logotipo actualizado.")
             st.rerun()
     conn.close()
 
 # ----------------------------------------------------
-# 9. GESTIÓN DE USUARIOS Y PERMISOS
+# 9. GESTIÓN DE USUARIOS
 # ----------------------------------------------------
-elif menu == "👥 Gestión de Usuarios y Permisos":
+elif menu == "Gestión de Usuarios":
     if st.session_state.user['rol'] != 'Administrador':
-        st.error("Acceso restringido al Administrador.")
+        st.error("Acceso exclusivo para Administradores.")
     else:
-        st.markdown('<p class="main-header">👥 Gestión de Usuarios, Roles y Permisos de Acceso</p>', unsafe_allow_html=True)
+        st.markdown('<p class="main-title">Gestión de Usuarios y Accesos</p>', unsafe_allow_html=True)
         conn = get_connection()
         
-        st.subheader("🛡️ Configuración de Permisos por Rol")
+        st.subheader("Permisos por Rol")
         roles_permisos = conn.execute("SELECT * FROM permisos_rol").fetchall()
 
         for rp in roles_permisos:
-            with st.expander(f"🛡️ Rol: {rp['rol']}##rol_{rp['rol']}"):
+            with st.expander(f"Rol: {rp['rol']}##rol_{rp['rol']}"):
                 with st.form(f"form_permiso_{rp['rol']}"):
-                    p_vende = st.checkbox("Puede Vender (POS)", value=bool(rp['puede_vender']), key=f"pv_{rp['rol']}")
-                    p_inv = st.checkbox("Puede Editar Inventario, Productos y Combos", value=bool(rp['puede_editar_inventario']), key=f"pi_{rp['rol']}")
-                    p_fin = st.checkbox("Puede Ver Finanzas, Ventas y Reportes", value=bool(rp['puede_ver_finanzas']), key=f"pf_{rp['rol']}")
-                    p_usr = st.checkbox("Puede Gestionar Usuarios y Permisos", value=bool(rp['puede_gestionar_usuarios']), key=f"pu_{rp['rol']}")
+                    p_vende = st.checkbox("Permiso de Venta", value=bool(rp['puede_vender']), key=f"pv_{rp['rol']}")
+                    p_inv = st.checkbox("Permiso de Inventario", value=bool(rp['puede_editar_inventario']), key=f"pi_{rp['rol']}")
+                    p_fin = st.checkbox("Permiso de Finanzas", value=bool(rp['puede_ver_finanzas']), key=f"pf_{rp['rol']}")
+                    p_usr = st.checkbox("Permiso de Usuarios", value=bool(rp['puede_gestionar_usuarios']), key=f"pu_{rp['rol']}")
 
-                    if st.form_submit_button(f"💾 Guardar Permisos de {rp['rol']}"):
+                    if st.form_submit_button("Guardar Permisos"):
                         cur = conn.cursor()
                         cur.execute("""
                         UPDATE permisos_rol SET puede_vender = ?, puede_editar_inventario = ?, puede_ver_finanzas = ?, puede_gestionar_usuarios = ? WHERE rol = ?
                         """, (int(p_vende), int(p_inv), int(p_fin), int(p_usr), rp['rol']))
                         conn.commit()
                         conn.close()
-                        st.success(f"¡Permisos de {rp['rol']} actualizados!")
+                        st.success("Permisos actualizados.")
                         st.rerun()
 
         st.markdown("---")
-        st.subheader("👥 Lista de Usuarios Existentes")
+        st.subheader("Directorio de Usuarios")
         usuarios_list = conn.execute("SELECT id, username, rol, nombre FROM usuarios").fetchall()
 
         for usr in usuarios_list:
-            with st.expander(f"👤 {usr['nombre']} ({usr['username']}) - Rol: {usr['rol']}##usr_{usr['id']}"):
+            with st.expander(f"{usr['nombre']} ({usr['username']}) - {usr['rol']}##usr_{usr['id']}"):
                 with st.form(f"form_edit_usr_{usr['id']}"):
-                    e_nombre = st.text_input("Nombre Completo", value=usr['nombre'], key=f"un_{usr['id']}")
-                    e_user = st.text_input("Usuario (Login)", value=usr['username'], key=f"uu_{usr['id']}")
+                    e_nombre = st.text_input("Nombre", value=usr['nombre'], key=f"un_{usr['id']}")
+                    e_user = st.text_input("Usuario", value=usr['username'], key=f"uu_{usr['id']}")
                     e_rol = st.selectbox("Rol", ["Administrador", "Socio", "Operador"], index=["Administrador", "Socio", "Operador"].index(usr['rol']), key=f"ur_{usr['id']}")
-                    e_pass = st.text_input("Nueva Contraseña (dejar en blanco para no cambiar)", type="password", key=f"up_{usr['id']}")
+                    e_pass = st.text_input("Nueva Contraseña (opcional)", type="password", key=f"up_{usr['id']}")
 
                     col_u1, col_u2 = st.columns(2)
                     with col_u1:
-                        b_u_save = st.form_submit_button("💾 Actualizar Usuario")
+                        b_u_save = st.form_submit_button("Actualizar", use_container_width=True)
                     with col_u2:
-                        b_u_del = st.form_submit_button("❌ Eliminar Usuario")
+                        b_u_del = st.form_submit_button("Eliminar", use_container_width=True)
 
                     if b_u_save:
                         cur = conn.cursor()
@@ -765,12 +817,12 @@ elif menu == "👥 Gestión de Usuarios y Permisos":
                             cur.execute("UPDATE usuarios SET nombre = ?, username = ?, rol = ? WHERE id = ?", (e_nombre, e_user, e_rol, usr['id']))
                         conn.commit()
                         conn.close()
-                        st.success("¡Usuario actualizado con éxito!")
+                        st.success("Usuario actualizado.")
                         st.rerun()
 
                     if b_u_del:
                         if usr['username'] == 'admin':
-                            st.error("No se puede eliminar al Administrador principal.")
+                            st.error("No se puede eliminar al admin principal.")
                         else:
                             cur = conn.cursor()
                             cur.execute("DELETE FROM usuarios WHERE id = ?", (usr['id'],))
@@ -780,21 +832,21 @@ elif menu == "👥 Gestión de Usuarios y Permisos":
                             st.rerun()
 
         st.markdown("---")
-        st.subheader("➕ Crear Usuario Nuevo")
+        st.subheader("Crear Usuario")
         with st.form("new_user_form"):
-            nu_u = st.text_input("Usuario (login)")
+            nu_u = st.text_input("Usuario")
             nu_p = st.text_input("Contraseña", type="password")
-            nu_r = st.selectbox("Rol Asignado", ["Administrador", "Socio", "Operador"])
+            nu_r = st.selectbox("Rol", ["Administrador", "Socio", "Operador"])
             nu_n = st.text_input("Nombre Completo")
 
-            if st.form_submit_button("Crear Usuario"):
+            if st.form_submit_button("Crear Usuario", use_container_width=True):
                 try:
                     cur = conn.cursor()
                     cur.execute("INSERT INTO usuarios (username, password, rol, nombre) VALUES (?, ?, ?, ?)", (nu_u, nu_p, nu_r, nu_n))
                     conn.commit()
                     conn.close()
-                    st.success("¡Usuario creado con éxito!")
+                    st.success("Usuario creado con éxito.")
                     st.rerun()
                 except:
-                    st.error("Error: El nombre de usuario ya existe.")
+                    st.error("Error: El usuario ya existe.")
         conn.close()
