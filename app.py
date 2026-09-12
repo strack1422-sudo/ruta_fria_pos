@@ -85,13 +85,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS Spotify Dark Mode Premium con Contraste Absoluto y Visibilidad de Inputs
+# Estilos CSS Spotify Dark Mode con BOTÓN DE BARRA LATERAL 100% VISIBLE (Cian brillante) y contraste impecable en inputs con fondo blanco
 st.markdown("""
 <style>
-    /* Ocultar elementos nativos innecesarios */
-    #MainMenu {visibility: hidden;}
+    /* GARANTIZAR VISIBILIDAD DEL BOTÓN DE BARRA LATERAL (COLLAPSED CONTROL) */
+    [data-testid="collapsedControl"] {
+        display: block !important;
+        visibility: visible !important;
+        color: #38bdf8 !important;
+        background-color: #1e293b !important;
+        border-radius: 6px !important;
+        padding: 4px !important;
+        z-index: 999999 !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        fill: #38bdf8 !important;
+    }
+
+    /* Ocultar únicamente el footer nativo de Streamlit, dejando intacto el control de barra lateral */
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     
     .stApp {
         background-color: #121212 !important;
@@ -121,12 +133,13 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Inputs y Selectboxes con alto contraste y texto blanco nítido */
-    input, textarea, select, .stTextInput input, .stNumberInput input, .stTextArea textarea, div[data-baseweb="select"] * {
-        background-color: #242424 !important;
-        color: #ffffff !important;
-        border: 1px solid #3e3e3e !important;
+    /* Campos de entrada con fondo blanco y letras oscuras nítidas desde el primer segundo */
+    input, textarea, select, .stTextInput input, .stNumberInput input, .stTextArea textarea {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
         border-radius: 8px !important;
+        font-weight: 600 !important;
     }
 
     /* Barra lateral estilo Spotify */
@@ -159,18 +172,18 @@ st.markdown("""
         text-align: center;
     }
 
-    /* Botones con acento Azul Hielo / Cian */
+    /* Botones con acento Cian Brillante (#0ea5e9 / #38bdf8) */
     .stButton>button {
-        background-color: #38bdf8 !important;
-        color: #0f172a !important;
+        background-color: #0ea5e9 !important;
+        color: #ffffff !important;
         border-radius: 8px !important;
         font-weight: 700 !important;
         border: none !important;
         transition: transform 0.1s ease, background-color 0.2s ease;
     }
     .stButton>button:hover {
-        background-color: #0ea5e9 !important;
-        color: #ffffff !important;
+        background-color: #38bdf8 !important;
+        color: #0f172a !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -316,7 +329,7 @@ if menu == "Punto de Venta":
             qc_nombre = st.text_input("Nombre Completo")
             qc_tel = st.text_input("Teléfono / WhatsApp")
             qc_dir = st.text_area("Dirección para Repartidor")
-            if st.form_submit_button("Guardar Cliente", use_container_width=True):
+            if st.form_submit_button("Guardar Cliente"):
                 if qc_nombre:
                     cur = conn.cursor()
                     cur.execute("INSERT INTO clientes (nombre, telefono, direccion) VALUES (?, ?, ?)", (qc_nombre, qc_tel, qc_dir))
@@ -694,6 +707,7 @@ elif menu == "Combos y Paquetes":
                 if b_cd:
                     cur = conn.cursor()
                     cur.execute("DELETE FROM combos WHERE id = ?", (combo['id'],))
+                    cur.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo['id'],))
                     conn.commit()
                     conn.close()
                     st.warning("Combo eliminado.")
