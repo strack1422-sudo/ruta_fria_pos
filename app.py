@@ -79,34 +79,98 @@ def init_tables():
 init_tables()
 
 st.set_page_config(
-    page_title="Ruta Fría - Enterprise POS & Management",
+    page_title="Ruta Fría - Spotify Dark Premium POS",
     page_icon="🧊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS limpios y seguros (sin ocultar texto en inputs ni selectboxes)
+# Estilos CSS Spotify Dark Mode Premium (Fondo #121212, tarjetas #181818, acento #38bdf8 azul hielo, textos blancos nítidos)
 st.markdown("""
 <style>
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #0f172a;
-        letter-spacing: -0.025em;
-        margin-bottom: 0px;
+    /* Ocultar elementos nativos */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    .stApp {
+        background-color: #121212 !important;
+        color: #ffffff !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-    .sub-title {
-        font-size: 1.05rem;
-        color: #475569;
-        margin-bottom: 24px;
+
+    /* Títulos y textos principales en blanco puro y gris claro */
+    h1, h2, h3, h4, h5, h6, .main-title {
+        color: #ffffff !important;
+        font-weight: 700;
     }
+    p, span, label, .sub-title {
+        color: #e2e8f0 !important;
+    }
+
+    /* Tarjetas estilo Spotify */
     .enterprise-card {
-        background: #ffffff;
+        background: #181818 !important;
         padding: 20px;
         border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        border: 1px solid #282828 !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
         margin-bottom: 16px;
+    }
+    .enterprise-card * {
+        color: #ffffff !important;
+    }
+
+    /* Inputs legibles con fondo oscuro integrado */
+    input, textarea, select, .stTextInput input, .stNumberInput input, .stTextArea textarea {
+        background-color: #242424 !important;
+        color: #ffffff !important;
+        border: 1px solid #3e3e3e !important;
+        border-radius: 8px !important;
+    }
+
+    /* Barra lateral estilo Spotify */
+    section[data-testid="stSidebar"] {
+        background-color: #000000 !important;
+        border-right: 1px solid #282828;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #ffffff !important;
+    }
+    section[data-testid="stSidebar"] .stRadio label {
+        color: #b3b3b3 !important;
+        font-weight: 500;
+        border-radius: 6px;
+        padding: 4px 8px;
+        transition: all 0.2s ease;
+    }
+    section[data-testid="stSidebar"] .stRadio label:hover {
+        color: #ffffff !important;
+        background-color: rgba(255,255,255,0.08);
+    }
+
+    /* Tarjeta de perfil en barra lateral */
+    .sidebar-user-card {
+        background: #212121;
+        padding: 14px;
+        border-radius: 10px;
+        border: 1px solid #333333;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+
+    /* Botones con acento Azul Hielo / Cian */
+    .stButton>button {
+        background-color: #38bdf8 !important;
+        color: #0f172a !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        border: none !important;
+        transition: transform 0.1s ease, background-color 0.2s ease;
+    }
+    .stButton>button:hover {
+        background-color: #0ea5e9 !important;
+        color: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -141,42 +205,45 @@ if st.session_state.user is None:
         else:
             st.image("https://img.icons8.com/color/96/cold-drink.png", width=100)
         
-        st.markdown("<h1 style='text-align: center; color: #0f172a; font-weight: 900;'>Ruta Fría POS</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #475569; font-size: 1rem;'>Plataforma Comercial de Alto Rendimiento</p>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #ffffff; font-weight: 900;'>Ruta Fría POS</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 1rem;'>Spotify Dark Premium Platform</p>", unsafe_allow_html=True)
         
-        with st.container():
-            st.markdown('<div class="enterprise-card">', unsafe_allow_html=True)
-            with st.form("login_form"):
-                username = st.text_input("Usuario Corporativo")
-                password = st.text_input("Contraseña de Acceso", type="password")
-                submit_login = st.form_submit_button("Iniciar Sesión Segura", use_container_width=True)
-                
-                if submit_login:
-                    conn = get_connection()
-                    user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
-                    conn.close()
-                    if user_row:
-                        st.session_state.user = {
-                            "id": user_row['id'],
-                            "username": user_row['username'],
-                            "nombre": user_row['nombre'],
-                            "rol": user_row['rol']
-                        }
-                        st.success(f"Bienvenido, {user_row['nombre']}")
-                        st.rerun()
-                    else:
-                        st.error("Credenciales inválidas.")
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="enterprise-card" style="margin-top: 20px;">', unsafe_allow_html=True)
+        with st.form("login_form"):
+            username = st.text_input("Usuario Corporativo")
+            password = st.text_input("Contraseña de Acceso", type="password")
+            submit_login = st.form_submit_button("Iniciar Sesión Segura", use_container_width=True)
+            
+            if submit_login:
+                conn = get_connection()
+                user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
+                conn.close()
+                if user_row:
+                    st.session_state.user = {
+                        "id": user_row['id'],
+                        "username": user_row['username'],
+                        "nombre": user_row['nombre'],
+                        "rol": user_row['rol']
+                    }
+                    st.success(f"Bienvenido, {user_row['nombre']}")
+                    st.rerun()
+                else:
+                    st.error("Credenciales inválidas.")
+        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# Menú lateral fijo y expandido con todas las secciones operativas visibles
+# Barra lateral fija y expandida con tarjeta de perfil elegante
 logo_file = get_config('logo_path')
 logo_path = os.path.join(os.path.dirname(__file__), logo_file if logo_file else "logo.png")
 if os.path.exists(logo_path):
     st.sidebar.image(logo_path, width=150)
 
-st.sidebar.markdown(f"**{st.session_state.user['nombre']}**\n\n`Rol: {st.session_state.user['rol']}`")
-st.sidebar.markdown("---")
+st.sidebar.markdown(f"""
+<div class="sidebar-user-card">
+    <p style="margin: 0; font-weight: 700; color: #ffffff; font-size: 0.95rem;">{st.session_state.user['nombre']}</p>
+    <p style="margin: 4px 0 0 0; color: #38bdf8; font-size: 0.8rem; font-weight: 600;">● Rol: {st.session_state.user['rol']}</p>
+</div>
+""", unsafe_allow_html=True)
 
 menu_options = {}
 if verificar_permiso('puede_vender'):
@@ -274,11 +341,11 @@ if menu == "Punto de Venta":
                 
                 st.markdown(f"""
                 <div class="enterprise-card">
-                    <h4 style="color: #0284c7; margin-top: 0; margin-bottom: 6px;">{prod['nombre']}</h4>
-                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{prod['descripcion']}</p>
+                    <h4 style="color: #38bdf8; margin-top: 0; margin-bottom: 6px;">{prod['nombre']}</h4>
+                    <p style="color: #94a3b8; font-size: 0.85rem; min-height: 38px;">{prod['descripcion']}</p>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                        <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a;">${prod['precio_venta']:.2f}</span>
-                        <span style="font-size: 0.75rem; color: #64748b;">Costo: ${prod['costo_calculado']:.2f}</span>
+                        <span style="font-size: 1.2rem; font-weight: 700; color: #4ade80;">${prod['precio_venta']:.2f}</span>
+                        <span style="font-size: 0.75rem; color: #94a3b8;">Costo: ${prod['costo_calculado']:.2f}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -324,15 +391,15 @@ if menu == "Punto de Venta":
         for idx, combo in enumerate(combos):
             with cols_c[idx % 2]:
                 st.markdown(f"""
-                <div class="enterprise-card" style="border-left: 4px solid #0284c7;">
-                    <h4 style="color: #0f172a; margin-top: 0; margin-bottom: 6px;">{combo['nombre']}</h4>
-                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{combo['descripcion']}</p>
+                <div class="enterprise-card" style="border-left: 4px solid #38bdf8;">
+                    <h4 style="color: #ffffff; margin-top: 0; margin-bottom: 6px;">{combo['nombre']}</h4>
+                    <p style="color: #94a3b8; font-size: 0.85rem; min-height: 38px;">{combo['descripcion']}</p>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
                         <div>
-                            <span style="text-decoration: line-through; color: #94a3b8; font-size: 0.9rem;">${combo['precio_regular']:.2f}</span>
-                            <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a; margin-left: 8px;">${combo['precio_combo']:.2f}</span>
+                            <span style="text-decoration: line-through; color: #64748b; font-size: 0.9rem;">${combo['precio_regular']:.2f}</span>
+                            <span style="font-size: 1.2rem; font-weight: 700; color: #4ade80; margin-left: 8px;">${combo['precio_combo']:.2f}</span>
                         </div>
-                        <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
+                        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -379,12 +446,12 @@ if menu == "Punto de Venta":
         utilidad_estimada = total_general - costo_general
 
         st.markdown(f"""
-        <div class="enterprise-card" style="background: #ffffff; display: flex; justify-content: space-between; align-items: center;">
+        <div class="enterprise-card" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <p style="margin: 0; color: #475569; font-size: 0.9rem;">Utilidad Neta Estimada: <strong style="color: #16a34a;">${utilidad_estimada:.2f}</strong></p>
+                <p style="margin: 0; color: #94a3b8; font-size: 0.9rem;">Utilidad Neta Estimada: <strong style="color: #4ade80;">${utilidad_estimada:.2f}</strong></p>
             </div>
             <div>
-                <h2 style="margin: 0; color: #0f172a;">Total a Cobrar: <span style="color: #16a34a;">${total_general:.2f}</span></h2>
+                <h2 style="margin: 0; color: #ffffff;">Total a Cobrar: <span style="color: #4ade80;">${total_general:.2f}</span></h2>
             </div>
         </div>
         """, unsafe_allow_html=True)
