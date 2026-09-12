@@ -85,10 +85,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS Spotify Dark Mode Premium (Fondo #121212, tarjetas #181818, acento #38bdf8 azul hielo, textos blancos nítidos)
+# Estilos CSS Spotify Dark Mode Premium con Contraste Absoluto y Visibilidad de Inputs
 st.markdown("""
 <style>
-    /* Ocultar elementos nativos */
+    /* Ocultar elementos nativos innecesarios */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -99,7 +99,7 @@ st.markdown("""
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
-    /* Títulos y textos principales en blanco puro y gris claro */
+    /* Títulos y textos principales en blanco puro y gris claro nítido */
     h1, h2, h3, h4, h5, h6, .main-title {
         color: #ffffff !important;
         font-weight: 700;
@@ -121,8 +121,8 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Inputs legibles con fondo oscuro integrado */
-    input, textarea, select, .stTextInput input, .stNumberInput input, .stTextArea textarea {
+    /* Inputs y Selectboxes con alto contraste y texto blanco nítido */
+    input, textarea, select, .stTextInput input, .stNumberInput input, .stTextArea textarea, div[data-baseweb="select"] * {
         background-color: #242424 !important;
         color: #ffffff !important;
         border: 1px solid #3e3e3e !important;
@@ -141,7 +141,7 @@ st.markdown("""
         color: #b3b3b3 !important;
         font-weight: 500;
         border-radius: 6px;
-        padding: 4px 8px;
+        padding: 6px 10px;
         transition: all 0.2s ease;
     }
     section[data-testid="stSidebar"] .stRadio label:hover {
@@ -316,7 +316,7 @@ if menu == "Punto de Venta":
             qc_nombre = st.text_input("Nombre Completo")
             qc_tel = st.text_input("Teléfono / WhatsApp")
             qc_dir = st.text_area("Dirección para Repartidor")
-            if st.form_submit_button("Guardar Cliente"):
+            if st.form_submit_button("Guardar Cliente", use_container_width=True):
                 if qc_nombre:
                     cur = conn.cursor()
                     cur.execute("INSERT INTO clientes (nombre, telefono, direccion) VALUES (?, ?, ?)", (qc_nombre, qc_tel, qc_dir))
@@ -558,6 +558,30 @@ elif menu == "Inventario":
                         conn.close()
                         st.warning("Insumo eliminado.")
                         st.rerun()
+
+    st.markdown("---")
+    st.subheader("➕ Dar de Alta Nuevo Insumo")
+    with st.form("nuevo_insumo_form_master"):
+        ni_nom = st.text_input("Nombre del Insumo / Materia Prima")
+        ni_cat = st.text_input("Categoría", value="General")
+        ni_uni = st.text_input("Unidad base (ml, g, pza)", value="pza")
+        ni_cost = st.number_input("Costo por unidad base ($)", min_value=0.0, value=10.0, format="%.4f")
+        ni_stk = st.number_input("Stock inicial", min_value=0.0, value=10.0)
+        ni_min = st.number_input("Stock mínimo de alerta", value=2.0)
+        ni_prov = st.text_input("Proveedor", value="Local")
+
+        if st.form_submit_button("Crear Insumo en Sistema", use_container_width=True):
+            if ni_nom:
+                cur = conn.cursor()
+                cur.execute("""
+                INSERT INTO insumos (nombre, categoria, unidad, costo_unidad, stock_actual, stock_minimo, proveedor, fecha_actualizacion)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (ni_nom, ni_cat, ni_uni, ni_cost, ni_stk, ni_min, ni_prov, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                conn.commit()
+                conn.close()
+                st.success("¡Insumo creado con éxito!")
+                st.rerun()
+
     conn.close()
 
 # ----------------------------------------------------
@@ -613,6 +637,24 @@ elif menu == "Productos y Recetas":
                     conn.close()
                     st.warning("Producto eliminado.")
                     st.rerun()
+
+    st.markdown("---")
+    st.subheader("➕ Dar de Alta Nuevo Producto o Bebida")
+    with st.form("nuevo_producto_form_master"):
+        np_nom = st.text_input("Nombre del Producto")
+        np_cat = st.text_input("Categoría", value="Bebidas")
+        np_prec = st.number_input("Precio de Venta ($)", min_value=1.0, value=75.0)
+        np_desc = st.text_area("Descripción de preparación")
+
+        if st.form_submit_button("Crear Producto", use_container_width=True):
+            if np_nom:
+                cur = conn.cursor()
+                cur.execute("INSERT INTO productos (nombre, categoria, precio_venta, descripcion, activo) VALUES (?, ?, ?, ?, 1)", (np_nom, np_cat, np_prec, np_desc))
+                conn.commit()
+                conn.close()
+                st.success("¡Producto creado con éxito!")
+                st.rerun()
+
     conn.close()
 
 # ----------------------------------------------------
@@ -652,11 +694,32 @@ elif menu == "Combos y Paquetes":
                 if b_cd:
                     cur = conn.cursor()
                     cur.execute("DELETE FROM combos WHERE id = ?", (combo['id'],))
-                    cur.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo['id'],))
                     conn.commit()
                     conn.close()
                     st.warning("Combo eliminado.")
                     st.rerun()
+
+    st.markdown("---")
+    st.subheader("➕ Dar de Alta Nuevo Combo o Paquete")
+    with st.form("nuevo_combo_form_master"):
+        nc_nom = st.text_input("Nombre del Paquete")
+        nc_desc = st.text_input("Descripción breve")
+        nc_reg = st.number_input("Precio Regular ($)", min_value=1.0, value=150.0)
+        nc_com = st.number_input("Precio Combo ($)", min_value=1.0, value=129.0)
+
+        if st.form_submit_button("Crear Paquete", use_container_width=True):
+            if nc_nom:
+                desc_calc = ((nc_reg - nc_com) / nc_reg) * 100 if nc_reg > 0 else 0
+                cur = conn.cursor()
+                cur.execute("""
+                INSERT INTO combos (nombre, descripcion, precio_regular, precio_combo, costo_total, descuento_porcentaje, fecha_creacion, activo)
+                VALUES (?, ?, ?, ?, 50.0, ?, ?, 1)
+                """, (nc_nom, nc_desc, nc_reg, nc_com, desc_calc, datetime.now().strftime("%Y-%m-%d")))
+                conn.commit()
+                conn.close()
+                st.success("¡Combo creado con éxito!")
+                st.rerun()
+
     conn.close()
 
 # ----------------------------------------------------
@@ -698,6 +761,24 @@ elif menu == "Clientes y Domicilios":
                     conn.close()
                     st.warning("Cliente eliminado.")
                     st.rerun()
+
+    st.markdown("---")
+    st.subheader("➕ Dar de Alta Nuevo Cliente")
+    with st.form("nuevo_cliente_form_master"):
+        ncl_nom = st.text_input("Nombre Completo")
+        ncl_tel = st.text_input("Teléfono / WhatsApp")
+        ncl_dir = st.text_area("Dirección exacta")
+        ncl_not = st.text_input("Referencias")
+
+        if st.form_submit_button("Guardar Cliente", use_container_width=True):
+            if ncl_nom:
+                cur = conn.cursor()
+                cur.execute("INSERT INTO clientes (nombre, telefono, direccion, notas) VALUES (?, ?, ?, ?)", (ncl_nom, ncl_tel, ncl_dir, ncl_not))
+                conn.commit()
+                conn.close()
+                st.success("¡Cliente registrado con éxito!")
+                st.rerun()
+
     conn.close()
 
 # ----------------------------------------------------
