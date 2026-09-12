@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import os
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "ruta_fria.db")
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -79,23 +81,54 @@ init_tables()
 st.set_page_config(
     page_title="Ruta Fría - Enterprise POS & Management",
     page_icon="🧊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Estilos CSS Corporativos Avanzados (Estilo Shopify / Square Enterprise)
+# Estilos CSS Corporativos Absolutos (Contraste perfecto, inputs blancos, barra lateral oscura fija)
 st.markdown("""
 <style>
-    /* Ocultar elementos nativos de Streamlit para apariencia nativa */
+    /* Ocultar elementos nativos innecesarios */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
     .stApp {
-        background-color: #f4f6f9;
+        background-color: #f8fafc;
+        color: #0f172a;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
-    /* Tarjetas corporativas flotantes */
+    /* Asegurar contraste total en textos de contenido principal */
+    p, span, label, h1, h2, h3, h4, h5, h6, div {
+        color: #0f172a !important;
+    }
+
+    /* Campos de entrada con fondo estrictamente blanco y letras oscuras */
+    input, textarea, select, .stTextInput input, .stNumberInput input, .stTextArea textarea {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+    }
+    
+    /* Barra lateral corporativa fija y oscura */
+    section[data-testid="stSidebar"] {
+        background-color: #0f172a !important;
+        border-right: 1px solid #1e293b;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #f8fafc !important;
+    }
+    section[data-testid="stSidebar"] .stRadio label {
+        color: #cbd5e1 !important;
+        font-weight: 500;
+    }
+    section[data-testid="stSidebar"] .stRadio label:hover {
+        color: #ffffff !important;
+    }
+
+    /* Tarjetas corporativas modernas */
     .enterprise-card {
         background: #ffffff;
         padding: 20px;
@@ -103,28 +136,26 @@ st.markdown("""
         border: 1px solid #e2e8f0;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         margin-bottom: 16px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .enterprise-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+    .enterprise-card * {
+        color: #0f172a !important;
     }
 
-    /* Encabezados modernos */
+    /* Encabezados limpios */
     .main-title {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #0f172a;
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #0f172a !important;
         letter-spacing: -0.025em;
         margin-bottom: 0px;
     }
     .sub-title {
-        font-size: 1rem;
-        color: #64748b;
+        font-size: 1.05rem;
+        color: #475569 !important;
         margin-bottom: 24px;
     }
 
-    /* Botones corporativos primarios */
+    /* Botones ejecutivos */
     .stButton>button {
         border-radius: 8px;
         font-weight: 600;
@@ -154,49 +185,48 @@ def verificar_permiso(permiso_key):
     return bool(row[permiso_key]) if row else False
 
 if st.session_state.user is None:
-    col1, col2, col3 = st.columns([1, 1.5, 1])
+    col1, col2, col3 = st.columns([1, 1.6, 1])
     with col2:
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
         logo_file = get_config('logo_path')
         logo_path = os.path.join(os.path.dirname(__file__), logo_file if logo_file else "logo.png")
         if os.path.exists(logo_path):
-            st.image(logo_path, width=200)
+            st.image(logo_path, width=220)
         else:
             st.image("https://img.icons8.com/color/96/cold-drink.png", width=100)
         
-        st.markdown("<h2 style='text-align: center; color: #0f172a; font-weight: 800;'>Ruta Fría Enterprise POS</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #64748b; font-size: 0.95rem;'>Plataforma centralizada de operaciones y ventas</p>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #0f172a !important; font-weight: 900;'>Ruta Fría POS</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #475569 !important; font-size: 1rem;'>Plataforma Comercial de Alto Rendimiento</p>", unsafe_allow_html=True)
         
-        with st.container():
-            st.markdown('<div class="enterprise-card">', unsafe_allow_html=True)
-            with st.form("login_form"):
-                username = st.text_input("Usuario Corporativo")
-                password = st.text_input("Contraseña de Acceso", type="password")
-                submit_login = st.form_submit_button("Iniciar Sesión Segura", use_container_width=True)
-                
-                if submit_login:
-                    conn = get_connection()
-                    user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
-                    conn.close()
-                    if user_row:
-                        st.session_state.user = {
-                            "id": user_row['id'],
-                            "username": user_row['username'],
-                            "nombre": user_row['nombre'],
-                            "rol": user_row['rol']
-                        }
-                        st.success(f"Sesión iniciada: {user_row['nombre']}")
-                        st.rerun()
-                    else:
-                        st.error("Credenciales inválidas.")
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="enterprise-card" style="margin-top: 20px;">', unsafe_allow_html=True)
+        with st.form("login_form"):
+            username = st.text_input("Usuario Corporativo")
+            password = st.text_input("Contraseña de Acceso", type="password")
+            submit_login = st.form_submit_button("Iniciar Sesión Segura", use_container_width=True)
+            
+            if submit_login:
+                conn = get_connection()
+                user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
+                conn.close()
+                if user_row:
+                    st.session_state.user = {
+                        "id": user_row['id'],
+                        "username": user_row['username'],
+                        "nombre": user_row['nombre'],
+                        "rol": user_row['rol']
+                    }
+                    st.success(f"Bienvenido, {user_row['nombre']}")
+                    st.rerun()
+                else:
+                    st.error("Credenciales inválidas. Verifique sus datos.")
+        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# Menú lateral ejecutivo con Iconos vectoriales nativos `:material/...`
+# Barra lateral fija y expandida con iconos vectoriales limpios
 logo_file = get_config('logo_path')
 logo_path = os.path.join(os.path.dirname(__file__), logo_file if logo_file else "logo.png")
 if os.path.exists(logo_path):
-    st.sidebar.image(logo_path, width=140)
+    st.sidebar.image(logo_path, width=150)
 
 st.sidebar.markdown(f"**{st.session_state.user['nombre']}**\n\n`Rol: {st.session_state.user['rol']}`")
 st.sidebar.markdown("---")
@@ -224,7 +254,6 @@ menu_options["Configuración"] = ":material/settings:"
 if verificar_permiso('puede_gestionar_usuarios'):
     menu_options["Gestión de Usuarios"] = ":material/admin_panel_settings:"
 
-# Radio de navegación con iconos vectoriales limpios
 selected_label = st.sidebar.radio(
     "Navegación Principal",
     options=list(menu_options.keys()),
@@ -237,7 +266,6 @@ if st.sidebar.button("Cerrar Sesión", use_container_width=True):
     st.session_state.carrito = []
     st.rerun()
 
-# Mapeo de selección
 menu = selected_label
 
 # ----------------------------------------------------
@@ -293,13 +321,18 @@ if menu == "Punto de Venta":
         cols = st.columns(3)
         for idx, prod in enumerate(productos):
             with cols[idx % 3]:
+                # Renderizar imagen real si existe y está guardada
+                img_path = prod['imagen_url'] if 'imagen_url' in prod.keys() else None
+                if img_path and os.path.exists(img_path):
+                    st.image(img_path, use_container_width=True)
+                
                 st.markdown(f"""
-                <div class="enterprise-card" style="min-height: 160px;">
-                    <h4 style="color: #0284c7; margin-top: 0; margin-bottom: 8px;">{prod['nombre']}</h4>
-                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{prod['descripcion']}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
-                        <span style="font-size: 1.25rem; font-weight: 700; color: #16a34a;">${prod['precio_venta']:.2f}</span>
-                        <span style="font-size: 0.75rem; color: #94a3b8;">Costo: ${prod['costo_calculado']:.2f}</span>
+                <div class="enterprise-card">
+                    <h4 style="color: #0284c7 !important; margin-top: 0; margin-bottom: 6px;">{prod['nombre']}</h4>
+                    <p style="color: #475569 !important; font-size: 0.85rem; min-height: 38px;">{prod['descripcion']}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                        <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a !important;">${prod['precio_venta']:.2f}</span>
+                        <span style="font-size: 0.75rem; color: #64748b !important;">Costo: ${prod['costo_calculado']:.2f}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -346,14 +379,14 @@ if menu == "Punto de Venta":
             with cols_c[idx % 2]:
                 st.markdown(f"""
                 <div class="enterprise-card" style="border-left: 4px solid #0284c7;">
-                    <h4 style="color: #0f172a; margin-top: 0; margin-bottom: 6px;">{combo['nombre']}</h4>
-                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{combo['descripcion']}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+                    <h4 style="color: #0f172a !important; margin-top: 0; margin-bottom: 6px;">{combo['nombre']}</h4>
+                    <p style="color: #475569 !important; font-size: 0.85rem; min-height: 38px;">{combo['descripcion']}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
                         <div>
-                            <span style="text-decoration: line-through; color: #94a3b8; font-size: 0.9rem;">${combo['precio_regular']:.2f}</span>
-                            <span style="font-size: 1.25rem; font-weight: 700; color: #16a34a; margin-left: 8px;">${combo['precio_combo']:.2f}</span>
+                            <span style="text-decoration: line-through; color: #94a3b8 !important; font-size: 0.9rem;">${combo['precio_regular']:.2f}</span>
+                            <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a !important; margin-left: 8px;">${combo['precio_combo']:.2f}</span>
                         </div>
-                        <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
+                        <span style="background: #e0f2fe; color: #0369a1 !important; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -400,12 +433,12 @@ if menu == "Punto de Venta":
         utilidad_estimada = total_general - costo_general
 
         st.markdown(f"""
-        <div class="enterprise-card" style="background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+        <div class="enterprise-card" style="background: #ffffff; display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Utilidad Neta Estimada: <strong style="color: #16a34a;">${utilidad_estimada:.2f}</strong></p>
+                <p style="margin: 0; color: #475569 !important; font-size: 0.9rem;">Utilidad Neta Estimada: <strong style="color: #16a34a !important;">${utilidad_estimada:.2f}</strong></p>
             </div>
             <div>
-                <h2 style="margin: 0; color: #0f172a;">Total a Cobrar: <span style="color: #16a34a;">${total_general:.2f}</span></h2>
+                <h2 style="margin: 0; color: #0f172a !important;">Total a Cobrar: <span style="color: #16a34a !important;">${total_general:.2f}</span></h2>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -515,35 +548,51 @@ elif menu == "Inventario":
     conn.close()
 
 # ----------------------------------------------------
-# 3. PRODUCTOS Y RECETAS
+# 3. PRODUCTOS Y RECETAS (CON SUBIDA DE IMAGEN REAL VIA FILE_UPLOADER)
 # ----------------------------------------------------
 elif menu == "Productos y Recetas":
     st.markdown('<p class="main-title">Catálogo de Productos y Recetas (Escandallo)</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-title">Estructura de costos por porción y márgenes de utilidad</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Estructura de costos, porciones y carga de fotografía oficial del producto</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     productos_list = conn.execute("SELECT * FROM productos").fetchall()
 
     for idx, prod in enumerate(productos_list):
         with st.expander(f"{prod['nombre']} — Venta: ${prod['precio_venta']:.2f}##{prod['id']}"):
+            # Mostrar imagen actual si existe
+            img_curr = prod['imagen_url'] if 'imagen_url' in prod.keys() else None
+            if img_curr and os.path.exists(img_curr):
+                st.image(img_curr, width=150)
+
             with st.form(f"form_prod_{prod['id']}"):
                 p_nom = st.text_input("Nombre", value=prod['nombre'], key=f"pn_{prod['id']}")
                 p_cat = st.text_input("Categoría", value=prod['categoria'], key=f"pc_{prod['id']}")
                 p_precio = st.number_input("Precio Venta ($)", value=float(prod['precio_venta']), key=f"pp_{prod['id']}")
                 p_desc = st.text_area("Descripción", value=str(prod['descripcion'] or ''), key=f"pd_{prod['id']}")
                 
+                # Selector de archivo físico para foto del producto
+                foto_subida = st.file_uploader("Subir fotografía corporativa (PNG / JPG)", type=["png", "jpg", "jpeg"], key=f"foto_{prod['id']}")
+
                 col_p1, col_p2 = st.columns(2)
                 with col_p1:
-                    b_p_save = st.form_submit_button("Guardar", use_container_width=True)
+                    b_p_save = st.form_submit_button("Guardar Cambios", use_container_width=True)
                 with col_p2:
-                    b_p_del = st.form_submit_button("Eliminar", use_container_width=True)
+                    b_p_del = st.form_submit_button("Eliminar Producto", use_container_width=True)
 
                 if b_p_save:
+                    ruta_guardada = img_curr
+                    if foto_subida is not None:
+                        filename = f"prod_{prod['id']}_{foto_subida.name}"
+                        ruta_guardada = os.path.join(UPLOAD_DIR, filename)
+                        with open(ruta_guardada, "wb") as f:
+                            f.write(foto_subida.getbuffer())
+
                     cur = conn.cursor()
-                    cur.execute("UPDATE productos SET nombre = ?, categoria = ?, precio_venta = ?, descripcion = ? WHERE id = ?", (p_nom, p_cat, p_precio, p_desc, prod['id']))
+                    cur.execute("UPDATE productos SET nombre = ?, categoria = ?, precio_venta = ?, descripcion = ?, imagen_url = ? WHERE id = ?", 
+                                (p_nom, p_cat, p_precio, p_desc, ruta_guardada, prod['id']))
                     conn.commit()
                     conn.close()
-                    st.success("Actualizado.")
+                    st.success("Producto e imagen actualizados con éxito.")
                     st.rerun()
 
                 if b_p_del:
@@ -551,7 +600,7 @@ elif menu == "Productos y Recetas":
                     cur.execute("DELETE FROM productos WHERE id = ?", (prod['id'],))
                     conn.commit()
                     conn.close()
-                    st.warning("Eliminado.")
+                    st.warning("Producto eliminado.")
                     st.rerun()
     conn.close()
 
@@ -645,7 +694,7 @@ elif menu == "Clientes y Domicilios":
 # ----------------------------------------------------
 elif menu == "Ventas y Tickets":
     st.markdown('<p class="main-title">Historial de Ventas y Tickets</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Registro de operaciones comerciales y auditoría</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Registro de operaciones comerciales y auditoría</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     ventas_df = pd.read_sql("SELECT * FROM ventas ORDER BY fecha_hora DESC", conn)
@@ -686,7 +735,7 @@ elif menu == "Ventas y Tickets":
 # ----------------------------------------------------
 elif menu == "Reportes y Balances":
     st.markdown('<p class="main-title">Reportes y Balances Financieros</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Análisis corporativo por rango de fechas personalizado</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Análisis corporativo por rango de fechas personalizado</p>', unsafe_allow_html=True)
 
     conn = get_connection()
     ventas_df = pd.read_sql("SELECT * FROM ventas", conn)
@@ -741,23 +790,39 @@ elif menu == "Reportes y Balances":
         st.info("Sin datos para graficar en el rango seleccionado.")
 
 # ----------------------------------------------------
-# 8. CONFIGURACIÓN
+# 8. CONFIGURACIÓN (CON ST.FILE_UPLOADER PARA ACTUALIZAR LOGO)
 # ----------------------------------------------------
 elif menu == "Configuración":
-    st.markdown('<p class="main-title">Configuración Corporativa</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-title">Configuración Corporativa y Logotipo</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Gestión y actualización de la imagen institucional de la empresa</p>', unsafe_allow_html=True)
+
     conn = get_connection()
     current_logo = get_config('logo_path')
     
-    st.info(f"Logotipo actual: {current_logo}")
-    with st.form("config_logo_form"):
-        nuevo_nombre_logo = st.text_input("Archivo de Logotipo (en carpeta ruta_fria_pos)", value=current_logo)
-        if st.form_submit_button("Actualizar Logotipo"):
-            cur = conn.cursor()
-            cur.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('logo_path', ?)", (nuevo_nombre_logo,))
-            conn.commit()
-            conn.close()
-            st.success("Logotipo actualizado.")
-            st.rerun()
+    logo_path = os.path.join(os.path.dirname(__file__), current_logo if current_logo else "logo.png")
+    if os.path.exists(logo_path):
+        st.image(logo_path, width=200)
+
+    st.markdown("---")
+    with st.form("config_logo_upload_form"):
+        st.subheader("Cargar Nuevo Logotipo Corporativo")
+        nuevo_logo_file = st.file_uploader("Seleccionar imagen institucional (PNG / JPG)", type=["png", "jpg", "jpeg"])
+        
+        if st.form_submit_button("Actualizar y Guardar Logotipo", use_container_width=True):
+            if nuevo_logo_file is not None:
+                filename = f"logo_corp_{nuevo_logo_file.name}"
+                ruta_logo = os.path.join(UPLOAD_DIR, filename)
+                with open(ruta_logo, "wb") as f:
+                    f.write(nuevo_logo_file.getbuffer())
+
+                cur = conn.cursor()
+                cur.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('logo_path', ?)", (ruta_logo,))
+                conn.commit()
+                conn.close()
+                st.success("¡Logotipo corporativo actualizado con éxito!")
+                st.rerun()
+            else:
+                st.warning("Por favor seleccione un archivo de imagen válido.")
     conn.close()
 
 # ----------------------------------------------------
