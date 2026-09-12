@@ -85,82 +85,28 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS Corporativos Absolutos (Contraste perfecto, inputs blancos, barra lateral oscura fija)
+# Estilos CSS limpios y seguros (sin ocultar texto en inputs ni selectboxes)
 st.markdown("""
 <style>
-    /* Ocultar elementos nativos innecesarios */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    .stApp {
-        background-color: #f8fafc;
-        color: #0f172a;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    /* Asegurar contraste total en textos de contenido principal */
-    p, span, label, h1, h2, h3, h4, h5, h6, div {
-        color: #0f172a !important;
-    }
-
-    /* Campos de entrada con fondo estrictamente blanco y letras oscuras */
-    input, textarea, select, .stTextInput input, .stNumberInput input, .stTextArea textarea {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-    }
-    
-    /* Barra lateral corporativa fija y oscura */
-    section[data-testid="stSidebar"] {
-        background-color: #0f172a !important;
-        border-right: 1px solid #1e293b;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #f8fafc !important;
-    }
-    section[data-testid="stSidebar"] .stRadio label {
-        color: #cbd5e1 !important;
-        font-weight: 500;
-    }
-    section[data-testid="stSidebar"] .stRadio label:hover {
-        color: #ffffff !important;
-    }
-
-    /* Tarjetas corporativas modernas */
-    .enterprise-card {
-        background: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        margin-bottom: 16px;
-    }
-    .enterprise-card * {
-        color: #0f172a !important;
-    }
-
-    /* Encabezados limpios */
     .main-title {
         font-size: 2.2rem;
         font-weight: 800;
-        color: #0f172a !important;
+        color: #0f172a;
         letter-spacing: -0.025em;
         margin-bottom: 0px;
     }
     .sub-title {
         font-size: 1.05rem;
-        color: #475569 !important;
+        color: #475569;
         margin-bottom: 24px;
     }
-
-    /* Botones ejecutivos */
-    .stButton>button {
-        border-radius: 8px;
-        font-weight: 600;
-        border: none;
-        transition: all 0.2s ease;
+    .enterprise-card {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        margin-bottom: 16px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -195,34 +141,35 @@ if st.session_state.user is None:
         else:
             st.image("https://img.icons8.com/color/96/cold-drink.png", width=100)
         
-        st.markdown("<h1 style='text-align: center; color: #0f172a !important; font-weight: 900;'>Ruta Fría POS</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #475569 !important; font-size: 1rem;'>Plataforma Comercial de Alto Rendimiento</p>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #0f172a; font-weight: 900;'>Ruta Fría POS</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #475569; font-size: 1rem;'>Plataforma Comercial de Alto Rendimiento</p>", unsafe_allow_html=True)
         
-        st.markdown('<div class="enterprise-card" style="margin-top: 20px;">', unsafe_allow_html=True)
-        with st.form("login_form"):
-            username = st.text_input("Usuario Corporativo")
-            password = st.text_input("Contraseña de Acceso", type="password")
-            submit_login = st.form_submit_button("Iniciar Sesión Segura", use_container_width=True)
-            
-            if submit_login:
-                conn = get_connection()
-                user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
-                conn.close()
-                if user_row:
-                    st.session_state.user = {
-                        "id": user_row['id'],
-                        "username": user_row['username'],
-                        "nombre": user_row['nombre'],
-                        "rol": user_row['rol']
-                    }
-                    st.success(f"Bienvenido, {user_row['nombre']}")
-                    st.rerun()
-                else:
-                    st.error("Credenciales inválidas. Verifique sus datos.")
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container():
+            st.markdown('<div class="enterprise-card">', unsafe_allow_html=True)
+            with st.form("login_form"):
+                username = st.text_input("Usuario Corporativo")
+                password = st.text_input("Contraseña de Acceso", type="password")
+                submit_login = st.form_submit_button("Iniciar Sesión Segura", use_container_width=True)
+                
+                if submit_login:
+                    conn = get_connection()
+                    user_row = conn.execute("SELECT * FROM usuarios WHERE username = ? AND password = ?", (username, password)).fetchone()
+                    conn.close()
+                    if user_row:
+                        st.session_state.user = {
+                            "id": user_row['id'],
+                            "username": user_row['username'],
+                            "nombre": user_row['nombre'],
+                            "rol": user_row['rol']
+                        }
+                        st.success(f"Bienvenido, {user_row['nombre']}")
+                        st.rerun()
+                    else:
+                        st.error("Credenciales inválidas.")
+            st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# Barra lateral fija y expandida con iconos vectoriales limpios
+# Menú lateral fijo y expandido con todas las secciones operativas visibles
 logo_file = get_config('logo_path')
 logo_path = os.path.join(os.path.dirname(__file__), logo_file if logo_file else "logo.png")
 if os.path.exists(logo_path):
@@ -321,18 +268,17 @@ if menu == "Punto de Venta":
         cols = st.columns(3)
         for idx, prod in enumerate(productos):
             with cols[idx % 3]:
-                # Renderizar imagen real si existe y está guardada
                 img_path = prod['imagen_url'] if 'imagen_url' in prod.keys() else None
                 if img_path and os.path.exists(img_path):
                     st.image(img_path, use_container_width=True)
                 
                 st.markdown(f"""
                 <div class="enterprise-card">
-                    <h4 style="color: #0284c7 !important; margin-top: 0; margin-bottom: 6px;">{prod['nombre']}</h4>
-                    <p style="color: #475569 !important; font-size: 0.85rem; min-height: 38px;">{prod['descripcion']}</p>
+                    <h4 style="color: #0284c7; margin-top: 0; margin-bottom: 6px;">{prod['nombre']}</h4>
+                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{prod['descripcion']}</p>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                        <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a !important;">${prod['precio_venta']:.2f}</span>
-                        <span style="font-size: 0.75rem; color: #64748b !important;">Costo: ${prod['costo_calculado']:.2f}</span>
+                        <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a;">${prod['precio_venta']:.2f}</span>
+                        <span style="font-size: 0.75rem; color: #64748b;">Costo: ${prod['costo_calculado']:.2f}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -379,14 +325,14 @@ if menu == "Punto de Venta":
             with cols_c[idx % 2]:
                 st.markdown(f"""
                 <div class="enterprise-card" style="border-left: 4px solid #0284c7;">
-                    <h4 style="color: #0f172a !important; margin-top: 0; margin-bottom: 6px;">{combo['nombre']}</h4>
-                    <p style="color: #475569 !important; font-size: 0.85rem; min-height: 38px;">{combo['descripcion']}</p>
+                    <h4 style="color: #0f172a; margin-top: 0; margin-bottom: 6px;">{combo['nombre']}</h4>
+                    <p style="color: #475569; font-size: 0.85rem; min-height: 38px;">{combo['descripcion']}</p>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
                         <div>
-                            <span style="text-decoration: line-through; color: #94a3b8 !important; font-size: 0.9rem;">${combo['precio_regular']:.2f}</span>
-                            <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a !important; margin-left: 8px;">${combo['precio_combo']:.2f}</span>
+                            <span style="text-decoration: line-through; color: #94a3b8; font-size: 0.9rem;">${combo['precio_regular']:.2f}</span>
+                            <span style="font-size: 1.2rem; font-weight: 700; color: #16a34a; margin-left: 8px;">${combo['precio_combo']:.2f}</span>
                         </div>
-                        <span style="background: #e0f2fe; color: #0369a1 !important; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Ahorro {combo['descuento_porcentaje']:.1f}%</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -435,10 +381,10 @@ if menu == "Punto de Venta":
         st.markdown(f"""
         <div class="enterprise-card" style="background: #ffffff; display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <p style="margin: 0; color: #475569 !important; font-size: 0.9rem;">Utilidad Neta Estimada: <strong style="color: #16a34a !important;">${utilidad_estimada:.2f}</strong></p>
+                <p style="margin: 0; color: #475569; font-size: 0.9rem;">Utilidad Neta Estimada: <strong style="color: #16a34a;">${utilidad_estimada:.2f}</strong></p>
             </div>
             <div>
-                <h2 style="margin: 0; color: #0f172a !important;">Total a Cobrar: <span style="color: #16a34a !important;">${total_general:.2f}</span></h2>
+                <h2 style="margin: 0; color: #0f172a;">Total a Cobrar: <span style="color: #16a34a;">${total_general:.2f}</span></h2>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -548,7 +494,7 @@ elif menu == "Inventario":
     conn.close()
 
 # ----------------------------------------------------
-# 3. PRODUCTOS Y RECETAS (CON SUBIDA DE IMAGEN REAL VIA FILE_UPLOADER)
+# 3. PRODUCTOS Y RECETAS
 # ----------------------------------------------------
 elif menu == "Productos y Recetas":
     st.markdown('<p class="main-title">Catálogo de Productos y Recetas (Escandallo)</p>', unsafe_allow_html=True)
@@ -559,7 +505,6 @@ elif menu == "Productos y Recetas":
 
     for idx, prod in enumerate(productos_list):
         with st.expander(f"{prod['nombre']} — Venta: ${prod['precio_venta']:.2f}##{prod['id']}"):
-            # Mostrar imagen actual si existe
             img_curr = prod['imagen_url'] if 'imagen_url' in prod.keys() else None
             if img_curr and os.path.exists(img_curr):
                 st.image(img_curr, width=150)
@@ -570,7 +515,6 @@ elif menu == "Productos y Recetas":
                 p_precio = st.number_input("Precio Venta ($)", value=float(prod['precio_venta']), key=f"pp_{prod['id']}")
                 p_desc = st.text_area("Descripción", value=str(prod['descripcion'] or ''), key=f"pd_{prod['id']}")
                 
-                # Selector de archivo físico para foto del producto
                 foto_subida = st.file_uploader("Subir fotografía corporativa (PNG / JPG)", type=["png", "jpg", "jpeg"], key=f"foto_{prod['id']}")
 
                 col_p1, col_p2 = st.columns(2)
@@ -790,7 +734,7 @@ elif menu == "Reportes y Balances":
         st.info("Sin datos para graficar en el rango seleccionado.")
 
 # ----------------------------------------------------
-# 8. CONFIGURACIÓN (CON ST.FILE_UPLOADER PARA ACTUALIZAR LOGO)
+# 8. CONFIGURACIÓN
 # ----------------------------------------------------
 elif menu == "Configuración":
     st.markdown('<p class="main-title">Configuración Corporativa y Logotipo</p>', unsafe_allow_html=True)
